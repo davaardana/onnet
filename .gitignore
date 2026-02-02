@@ -1,0 +1,17 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+
+# Environment files
+.env
+.env.local
+.env.production
+backend/.env
+backend/.env.local
+backend/.env.production
+
+# Documentation
+README.md
+*.md
