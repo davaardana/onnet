@@ -34,10 +34,10 @@ router.post('/register', [
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Insert user
+    // Insert user with default role 'user' (NOT admin)
     const result = await db.query(
-      'INSERT INTO users (name, email, phone, password) VALUES ($1, $2, $3, $4) RETURNING id, name, email, phone, created_at',
-      [name, email, phone, hashedPassword]
+      'INSERT INTO users (name, email, phone, password, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, phone, role, created_at',
+      [name, email, phone, hashedPassword, 'user']
     );
 
     const user = result.rows[0];

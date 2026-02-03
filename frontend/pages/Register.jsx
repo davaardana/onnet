@@ -24,7 +24,7 @@ const Register = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -44,14 +44,38 @@ const Register = () => {
       return;
     }
 
-    // Demo registration
-    register({
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone
-    });
+    try {
+      // Call backend register API
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      const response = await fetch(`${apiUrl}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password
+        })
+      });
 
-    navigate('/');
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Registrasi gagal');
+        return;
+      }
+
+      // Save user and token
+      register(data.user, data.token);
+
+      // Navigate to home
+      navigate('/');
+    } catch (err) {
+      console.error('Register error:', err);
+      setError('Terjadi kesalahan saat registrasi. Silakan coba lagi.');
+    }
   };
 
   return (

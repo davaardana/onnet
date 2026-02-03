@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-netpoint_db}
       POSTGRES_USER: ${DB_USER:-netpoint_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-your_secure_password_here}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-onnet123}
     ports:
       - "5435:5432"
     volumes:
@@ -38,7 +38,7 @@ services:
       - DB_PORT=5432
       - DB_NAME=${DB_NAME:-netpoint_db}
       - DB_USER=${DB_USER:-netpoint_user}
-      - DB_PASSWORD=${DB_PASSWORD:-your_secure_password_here}
+      - DB_PASSWORD=${DB_PASSWORD:-onnet123}
       - DB_SSL=false
       - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key_here}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
@@ -58,6 +58,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8001/api
     container_name: netpoint-frontend
     restart: unless-stopped
     ports:
@@ -66,6 +68,22 @@ services:
       - backend
     networks:
       - netpoint-network
+
+  # pgAdmin
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: netpoint-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@netpoint.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    networks:
+      - netpoint-network
+    depends_on:
+      - postgres
 
 volumes:
   postgres_data:
