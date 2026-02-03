@@ -49,7 +49,7 @@ router.get('/stats', auth, isAdmin, async (req, res) => {
       SELECT 
         COALESCE(SUM(pt.monthly_price), 0) as total_revenue
       FROM orders o
-      JOIN pricing_tiers pt ON o.pricing_tier_id = pt.id
+      JOIN pricing_tiers pt ON o.tier_id = pt.id
       WHERE o.status = 'completed'
     `);
     const totalRevenue = parseInt(revenueResult.rows[0].total_revenue || 0);
@@ -60,7 +60,7 @@ router.get('/stats', auth, isAdmin, async (req, res) => {
         DATE_TRUNC('month', o.created_at) as month,
         SUM(pt.monthly_price) as revenue
       FROM orders o
-      JOIN pricing_tiers pt ON o.pricing_tier_id = pt.id
+      JOIN pricing_tiers pt ON o.tier_id = pt.id
       WHERE o.status = 'completed'
         AND o.created_at >= NOW() - INTERVAL '6 months'
       GROUP BY DATE_TRUNC('month', o.created_at)
@@ -83,7 +83,7 @@ router.get('/stats', auth, isAdmin, async (req, res) => {
       FROM orders o
       JOIN users u ON o.user_id = u.id
       JOIN locations l ON o.location_id = l.id
-      JOIN pricing_tiers pt ON o.pricing_tier_id = pt.id
+      JOIN pricing_tiers pt ON o.tier_id = pt.id
       ORDER BY o.created_at DESC
       LIMIT 10
     `);
@@ -179,7 +179,7 @@ router.get('/orders', auth, isAdmin, async (req, res) => {
       FROM orders o
       JOIN users u ON o.user_id = u.id
       JOIN locations l ON o.location_id = l.id
-      JOIN pricing_tiers pt ON o.pricing_tier_id = pt.id
+      JOIN pricing_tiers pt ON o.tier_id = pt.id
     `;
 
     const params = [limit, offset];

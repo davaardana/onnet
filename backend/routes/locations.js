@@ -2,7 +2,14 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 
-// Search locations
+// Simple in-memory cache
+const cache = {
+  allLocations: null,
+  timestamp: null,
+  TTL: 5 * 60 * 1000 // 5 minutes
+};
+
+// Search locations with caching
 router.get('/search', async (req, res) => {
   try {
     const { q } = req.query;
@@ -10,6 +17,9 @@ router.get('/search', async (req, res) => {
     if (!q) {
       return res.status(400).json({ error: 'Search query is required' });
     }
+
+    // Set cache headers
+    res.set('Cache-Control', 'public, max-age=300'); // 5 minutes
 
     const result = await db.query(
       `SELECT * FROM locations 
@@ -30,17 +40,35 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// Get all locations
+// Get all locations with caching
 router.get('/', async (req, res) => {
   try {
+    const now = Date.now();
+    
+    // Check if cache is valid
+    if (cache.allLocations && cache.timestamp && (now - cache.timestamp) < cache.TTL) {
+      res.set('Cache-Control', 'public, max-age=300');
+      res.set('X-Cache', 'HIT');
+      return res.json(cache.allLocations);
+    }
+
+    // Fetch from database
     const result = await db.query(
       'SELECT * FROM locations ORDER BY is_onnet DESC, name ASC'
     );
 
-    res.json({
+    const response = {
       locations: result.rows,
       count: result.rows.length
-    });
+    };
+
+    // Update cache
+    cache.allLocations = response;
+    cache.timestamp = now;
+
+    res.set('Cache-Control', 'public, max-age=300');
+    res.set('X-Cache', 'MISS');
+    res.json(response);
   } catch (error) {
     console.error('Get locations error:', error);
     res.status(500).json({ error: 'Server error' });

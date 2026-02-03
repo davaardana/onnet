@@ -1,7 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const passport = require('./config/passport');
+const rateLimit = require('express-rate-limit');
+const compression = require('compression');
 const authRoutes = require('./routes/auth');
 const locationRoutes = require('./routes/locations');
 const orderRoutes = require('./routes/orders');
@@ -13,11 +14,33 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Enable compression for all responses
+app.use(compression());
+
+// Enable ETag for caching
+app.set('etag', 'strong');
+
+// Rate limiting middleware
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 login/register attempts per windowMs
+  message: 'Too many authentication attempts, please try again later.',
+  skipSuccessfulRequests: true,
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(passport.initialize());
+app.use('/api/', generalLimiter);
 
 // Initialize database on startup
 initDatabase().then(() => {
@@ -27,7 +50,7 @@ initDatabase().then(() => {
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);

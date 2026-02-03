@@ -4,7 +4,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const db = require('../config/database');
-const passport = require('../config/passport');
 
 // Register
 router.post('/register', [
@@ -86,11 +85,6 @@ router.post('/login', [
 
     const user = result.rows[0];
 
-    // Check if password exists (not Google OAuth user)
-    if (!user.password) {
-      return res.status(401).json({ error: 'Please login with Google' });
-    }
-
     // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
@@ -120,36 +114,5 @@ router.post('/login', [
     res.status(500).json({ error: 'Server error during login' });
   }
 });
-
-// Google OAuth Routes
-router.get('/google',
-  passport.authenticate('google', { 
-    scope: ['profile', 'email'],
-    session: false
-  })
-);
-
-router.get('/google/callback',
-  passport.authenticate('google', { 
-    failureRedirect: '/login',
-    session: false
-  }),
-  async (req, res) => {
-    try {
-      // Generate JWT for Google user
-      const token = jwt.sign(
-        { userId: req.user.id, email: req.user.email, role: req.user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-
-      // Redirect to frontend with token
-      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/callback?token=${token}`);
-    } catch (error) {
-      console.error('Google callback error:', error);
-      res.redirect('/login?error=auth_failed');
-    }
-  }
-);
 
 module.exports = router;
