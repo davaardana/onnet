@@ -15,34 +15,34 @@ const Footer = () => {
               </span>
             </div>
             <p className="text-gray-600 dark:text-gray-400 text-sm">
-              Connect Your Business Anywhere. Solusi jaringan terpadu untuk bisnis Anda dengan akses ke berbagai provider nasional.
+              Connect Your Business Anywhere. Integrated network solutions for your business with access to nationwide providers.
             </p>
           </div>
 
           {/* Quick Links */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Tautan Cepat
+              Quick Links
             </h3>
             <ul className="space-y-2">
               <li>
                 <a href="/" className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm">
-                  Beranda
+                  Home
                 </a>
               </li>
               <li>
                 <a href="/search" className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm">
-                  Cari Lokasi
+                  Search Location
                 </a>
               </li>
               <li>
                 <a href="#" className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm">
-                  Tentang Kami
+                  About Us
                 </a>
               </li>
               <li>
                 <a href="#" className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm">
-                  Layanan
+                  Services
                 </a>
               </li>
             </ul>
@@ -51,7 +51,7 @@ const Footer = () => {
           {/* Contact */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Hubungi Kami
+              Contact Us
             </h3>
             <ul className="space-y-3">
               <li className="flex items-start space-x-3">

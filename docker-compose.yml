@@ -43,9 +43,9 @@ services:
       - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key_here}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - GOOGLE_CALLBACK_URL=http://localhost:8001/api/auth/google/callback
-      - FRONTEND_URL=http://localhost:8080
-      - CORS_ORIGIN=http://localhost:8080
+      - GOOGLE_CALLBACK_URL=https://api.onnet.ticketingmosaik.com/api/auth/google/callback
+      - FRONTEND_URL=https://onnet.ticketingmosaik.com
+      - CORS_ORIGIN=https://onnet.ticketingmosaik.com
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,7 +59,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost:8001/api
+        VITE_API_URL: https://api.onnet.ticketingmosaik.com/api
     container_name: netpoint-frontend
     restart: unless-stopped
     ports:

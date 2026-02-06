@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Results from './pages/Results';
 import AdminDashboard from './pages/AdminDashboard';
+import Pricing from './pages/Pricing';
 import AuthCallback from './pages/AuthCallback';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
                 <Route path="/results" element={<Results />} />
                 <Route path="/search" element={<Home />} />
                 <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/pricing" element={<Pricing />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
               </Routes>
             </main>

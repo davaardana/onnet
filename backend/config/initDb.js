@@ -57,11 +57,117 @@ const initDatabase = async () => {
         location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
         tier_id INTEGER REFERENCES pricing_tiers(id) ON DELETE SET NULL,
         location_name VARCHAR(255) NOT NULL,
+        bandwidth_mbps INTEGER,
+        service_type VARCHAR(50),
+        zone VARCHAR(50),
         status VARCHAR(50) DEFAULT 'pending',
         notes TEXT,
+        source VARCHAR(50),
+        whatsapp_number VARCHAR(32),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Price list table (price book 2026)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS price_list (
+        id SERIAL PRIMARY KEY,
+        bandwidth_mbps INTEGER NOT NULL,
+        domestic_otc DECIMAL(15,2),
+        domestic_mrc_zone1 DECIMAL(15,2),
+        domestic_mrc_zone2 DECIMAL(15,2),
+        domestic_mrc_zone3 DECIMAL(15,2),
+        domestic_mrc_zone4 DECIMAL(15,2),
+        intl_otc DECIMAL(15,2),
+        intl_mrc_zone1 DECIMAL(15,2),
+        intl_mrc_zone2 DECIMAL(15,2),
+        intl_mrc_zone3 DECIMAL(15,2),
+        intl_mrc_zone4 DECIMAL(15,2),
+        dia_otc DECIMAL(15,2),
+        dia_mrc DECIMAL(15,2),
+        idia_bw INTEGER,
+        idia_otc DECIMAL(15,2),
+        idia_mrc DECIMAL(15,2),
+        year INTEGER DEFAULT 2026,
+        status VARCHAR(50) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_price_bandwidth_year ON price_list(bandwidth_mbps, year);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_price_status ON price_list(status);`);
+
+    // Quote logs (new, non-conflicting with legacy quotes table)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS quote_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        source VARCHAR(50) NOT NULL,
+        bandwidth_mbps INTEGER NOT NULL,
+        service_type VARCHAR(50) NOT NULL,
+        zone VARCHAR(50),
+        price_list_id INTEGER,
+        building_id INTEGER REFERENCES buildings(id) ON DELETE SET NULL,
+        building_name VARCHAR(255),
+        location_query TEXT,
+        otc DECIMAL(15,2),
+        mrc DECIMAL(15,2),
+        whatsapp_number VARCHAR(32),
+        status VARCHAR(20) DEFAULT 'pending',
+        notes TEXT,
+        metadata JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_quote_logs_status ON quote_logs(status);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_quote_logs_user ON quote_logs(user_id);`);
+
+    // Quotes table: skip migration to avoid conflicting with existing schema in production DB
+    console.log('Quotes migration skipped (existing schema retained)');
+
+    // Refresh tokens table (hashed tokens)
+    try {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS refresh_tokens (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          token_hash VARCHAR(128) UNIQUE NOT NULL,
+          user_agent TEXT,
+          ip_address TEXT,
+          expires_at TIMESTAMP NOT NULL,
+          revoked_at TIMESTAMP,
+          replaced_by_token_hash VARCHAR(128),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+      `);
+    } catch (err) {
+      console.warn('Refresh tokens table/index skipped:', err.message);
+    }
+
+    // Audit logs table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        action VARCHAR(100) NOT NULL,
+        resource VARCHAR(100) NOT NULL,
+        ip_address TEXT,
+        user_agent TEXT,
+        metadata JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
     `);
 
     console.log('Database tables initialized successfully');

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
 const db = require('../config/database');
 
 // Middleware to check if user is admin
@@ -23,15 +23,27 @@ const isAdmin = async (req, res, next) => {
 };
 
 // Get dashboard statistics
-router.get('/stats', auth, isAdmin, async (req, res) => {
+router.get('/stats', authMiddleware, isAdmin, async (req, res) => {
   try {
     // Total users
     const usersResult = await db.query('SELECT COUNT(*) as count FROM users');
     const totalUsers = parseInt(usersResult.rows[0].count);
 
+    // Total external (non-admin) users
+    const extResult = await db.query("SELECT COUNT(*) as count FROM users WHERE role <> 'admin'");
+    const totalExternalUsers = parseInt(extResult.rows[0].count);
+
     // Total orders
     const ordersResult = await db.query('SELECT COUNT(*) as count FROM orders');
     const totalOrders = parseInt(ordersResult.rows[0].count);
+
+    // Total buildings
+    const buildingsResult = await db.query('SELECT COUNT(*) as count FROM buildings');
+    const totalBuildings = parseInt(buildingsResult.rows[0].count);
+
+    // Price book rows
+    const priceResult = await db.query('SELECT COUNT(*) as count FROM price_list WHERE status = $1', ['active']);
+    const totalPriceRows = parseInt(priceResult.rows[0].count);
 
     // Orders by status
     const statusResult = await db.query(`
@@ -72,18 +84,22 @@ router.get('/stats', auth, isAdmin, async (req, res) => {
     const recentOrdersResult = await db.query(`
       SELECT 
         o.id,
-        o.order_number,
         o.status,
         o.created_at,
+        o.bandwidth_mbps,
+        o.service_type,
+        o.zone,
+        o.source,
+        o.whatsapp_number,
         u.name as user_name,
         u.email as user_email,
-        l.name as location_name,
+        COALESCE(l.name, o.location_name) as location_name,
         pt.tier_name,
         pt.monthly_price
       FROM orders o
-      JOIN users u ON o.user_id = u.id
-      JOIN locations l ON o.location_id = l.id
-      JOIN pricing_tiers pt ON o.tier_id = pt.id
+      LEFT JOIN users u ON o.user_id = u.id
+      LEFT JOIN locations l ON o.location_id = l.id
+      LEFT JOIN pricing_tiers pt ON o.tier_id = pt.id
       ORDER BY o.created_at DESC
       LIMIT 10
     `);
@@ -103,14 +119,27 @@ router.get('/stats', auth, isAdmin, async (req, res) => {
     `);
     const topLocations = topLocationsResult.rows;
 
+    // Quote logs (latest 10)
+    const quoteLogsResult = await db.query(`
+      SELECT ql.*, u.name AS user_name, u.email AS user_email
+      FROM quote_logs ql
+      LEFT JOIN users u ON ql.user_id = u.id
+      ORDER BY ql.created_at DESC
+      LIMIT 10
+    `);
+
     res.json({
       totalUsers,
+      totalExternalUsers,
       totalOrders,
+      totalBuildings,
+      totalPriceRows,
       totalRevenue,
       ordersByStatus,
       monthlyRevenue,
       recentOrders,
-      topLocations
+      topLocations,
+      quoteLogs: quoteLogsResult.rows
     });
   } catch (error) {
     console.error('Get stats error:', error);
@@ -118,8 +147,101 @@ router.get('/stats', auth, isAdmin, async (req, res) => {
   }
 });
 
+// Admin data explorer: returns paged datasets for FE tables
+router.get('/datasets', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+    const q = (req.query.q || '').trim();
+
+    const buildingParams = [];
+    let buildingWhere = '';
+    if (q) {
+      buildingParams.push(`%${q}%`);
+      buildingWhere = `WHERE building_name ILIKE $1 OR address ILIKE $1 OR city ILIKE $1 OR zone ILIKE $1`;
+    }
+
+    const buildingsQuery = `
+      SELECT id, building_name, address, city, zone, country, status
+      FROM buildings
+      ${buildingWhere}
+      ORDER BY building_name
+      LIMIT $${buildingParams.length + 1} OFFSET $${buildingParams.length + 2}
+    `;
+
+    const buildings = await db.query(
+      buildingsQuery,
+      [...buildingParams, limit, offset]
+    );
+
+    const buildingsTotalResult = await db.query(
+      `SELECT COUNT(*) as count FROM buildings ${buildingWhere}`,
+      buildingParams
+    );
+
+    const priceList = await db.query(
+      `SELECT id, bandwidth_mbps,
+              domestic_otc, domestic_mrc_zone1, domestic_mrc_zone2, domestic_mrc_zone3, domestic_mrc_zone4,
+              intl_otc, intl_mrc_zone1, intl_mrc_zone2, intl_mrc_zone3, intl_mrc_zone4,
+              dia_otc, dia_mrc,
+              idia_otc, idia_mrc,
+              year, status
+         FROM price_list
+         WHERE status = 'active'
+         ORDER BY bandwidth_mbps`
+    );
+
+    const priceListTotalResult = await db.query(
+      `SELECT COUNT(*) as count FROM price_list WHERE status = 'active'`
+    );
+
+    const quoteLogs = await db.query(
+      `SELECT ql.*, u.name AS user_name, u.email AS user_email
+         FROM quote_logs ql
+         LEFT JOIN users u ON ql.user_id = u.id
+         ORDER BY ql.created_at DESC
+         LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+
+    const quoteLogsTotalResult = await db.query(
+      `SELECT COUNT(*) as count FROM quote_logs`
+    );
+
+    const usersExternal = await db.query(
+      `SELECT id, name, email, phone, role, created_at
+         FROM users
+        WHERE role <> 'admin'
+        ORDER BY created_at DESC
+        LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+
+    const usersExternalTotalResult = await db.query(
+      `SELECT COUNT(*) as count FROM users WHERE role <> 'admin'`
+    );
+
+    res.json({
+      buildings: buildings.rows,
+      buildingsTotal: parseInt(buildingsTotalResult.rows[0].count, 10),
+      priceList: priceList.rows,
+      priceListTotal: parseInt(priceListTotalResult.rows[0].count, 10),
+      quoteLogs: quoteLogs.rows,
+      quoteLogsTotal: parseInt(quoteLogsTotalResult.rows[0].count, 10),
+      usersExternal: usersExternal.rows,
+      usersExternalTotal: parseInt(usersExternalTotalResult.rows[0].count, 10),
+      limit,
+      offset,
+      q
+    });
+  } catch (error) {
+    console.error('Get datasets error:', error);
+    res.status(500).json({ error: 'Failed to fetch datasets' });
+  }
+});
+
 // Get all users
-router.get('/users', auth, isAdmin, async (req, res) => {
+router.get('/users', authMiddleware, isAdmin, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -152,7 +274,7 @@ router.get('/users', auth, isAdmin, async (req, res) => {
 });
 
 // Get all orders (admin view)
-router.get('/orders', auth, isAdmin, async (req, res) => {
+router.get('/orders', authMiddleware, isAdmin, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -162,24 +284,28 @@ router.get('/orders', auth, isAdmin, async (req, res) => {
     let query = `
       SELECT 
         o.id,
-        o.order_number,
         o.status,
         o.notes,
         o.created_at,
         o.updated_at,
+        o.bandwidth_mbps,
+        o.service_type,
+        o.zone,
+        o.source,
+        o.whatsapp_number,
         u.name as user_name,
         u.email as user_email,
         u.phone as user_phone,
-        l.name as location_name,
-        l.address as location_address,
+        COALESCE(l.name, o.location_name) as location_name,
+        COALESCE(l.address, o.location_name) as location_address,
         l.city as location_city,
         pt.tier_name,
         pt.capacity,
         pt.monthly_price
       FROM orders o
-      JOIN users u ON o.user_id = u.id
-      JOIN locations l ON o.location_id = l.id
-      JOIN pricing_tiers pt ON o.tier_id = pt.id
+      LEFT JOIN users u ON o.user_id = u.id
+      LEFT JOIN locations l ON o.location_id = l.id
+      LEFT JOIN pricing_tiers pt ON o.tier_id = pt.id
     `;
 
     const params = [limit, offset];
@@ -216,7 +342,7 @@ router.get('/orders', auth, isAdmin, async (req, res) => {
 });
 
 // Update order status (admin only)
-router.put('/orders/:id/status', auth, isAdmin, async (req, res) => {
+router.put('/orders/:id/status', authMiddleware, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, notes } = req.body;
@@ -249,7 +375,7 @@ router.put('/orders/:id/status', auth, isAdmin, async (req, res) => {
 });
 
 // Update user role
-router.put('/users/:id/role', auth, isAdmin, async (req, res) => {
+router.put('/users/:id/role', authMiddleware, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { role } = req.body;

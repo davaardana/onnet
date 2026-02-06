@@ -33,33 +33,41 @@ const Navbar = () => {
               to="/"
               className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
             >
-              Beranda
+              Home
             </Link>
             <Link
               to="/search"
               className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
             >
-              Cari Lokasi
+              Search Location
             </Link>
 
             {isAuthenticated ? (
               <>
                 {user?.role === 'admin' && (
-                  <Link
-                    to="/admin"
-                    className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                  >
-                    Admin Dashboard
-                  </Link>
+                  <>
+                    <Link
+                      to="/admin"
+                      className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                    >
+                      Admin Dashboard
+                    </Link>
+                    <Link
+                      to="/pricing"
+                      className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                    >
+                      Pricing
+                    </Link>
+                  </>
                 )}
                 <span className="text-gray-700 dark:text-gray-300">
-                  Halo, {user?.name || 'User'}
+                  Hello, {user?.name || 'User'}
                 </span>
                 <button
                   onClick={handleLogout}
                   className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors"
                 >
-                  Keluar
+                  Sign Out
                 </button>
               </>
             ) : (
@@ -68,13 +76,13 @@ const Navbar = () => {
                   to="/login"
                   className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                 >
-                  Masuk
+                  Sign In
                 </Link>
                 <Link
                   to="/register"
                   className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors"
                 >
-                  Daftar
+                  Sign Up
                 </Link>
               </>
             )}
@@ -127,20 +135,20 @@ const Navbar = () => {
               className="block text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 py-2"
               onClick={() => setIsMenuOpen(false)}
             >
-              Beranda
+              Home
             </Link>
             <Link
               to="/search"
               className="block text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 py-2"
               onClick={() => setIsMenuOpen(false)}
             >
-              Cari Lokasi
+              Search Location
             </Link>
 
             {isAuthenticated ? (
               <>
                 <div className="text-gray-700 dark:text-gray-300 py-2">
-                  Halo, {user?.name || 'User'}
+                  Hello, {user?.name || 'User'}
                 </div>
                 <button
                   onClick={() => {
@@ -149,7 +157,7 @@ const Navbar = () => {
                   }}
                   className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors"
                 >
-                  Keluar
+                  Sign Out
                 </button>
               </>
             ) : (
@@ -159,14 +167,14 @@ const Navbar = () => {
                   className="block text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 py-2"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  Masuk
+                  Sign In
                 </Link>
                 <Link
                   to="/register"
                   className="block bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors text-center"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  Daftar
+                  Sign Up
                 </Link>
               </>
             )}

@@ -23,7 +23,7 @@ const Home = () => {
               Connect Your Business Anywhere
             </h1>
             <p className="text-xl md:text-2xl mb-12 text-primary-100">
-              Cari lokasi gedung Anda untuk mendapatkan penawaran harga instan dari jaringan Netpoint
+              Find your building location to get instant pricing from the Netpoint network.
             </p>
 
             {/* Search Form */}
@@ -33,7 +33,7 @@ const Home = () => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Ketik Nama Gedung / Alamat"
+                  placeholder="Type Building Name / Address"
                   className="w-full px-6 py-4 md:py-5 text-lg rounded-full text-gray-900 dark:text-white bg-white dark:bg-gray-800 shadow-2xl focus:outline-none focus:ring-4 focus:ring-primary-300 dark:focus:ring-primary-600 pr-32"
                 />
                 <button
@@ -53,16 +53,16 @@ const Home = () => {
       <section className="py-20 bg-gradient-to-r from-primary-600 to-primary-700 dark:from-primary-700 dark:to-primary-800">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
-            Siap Terhubung dengan Netpoint?
+            Ready to Connect with Netpoint?
           </h2>
           <p className="text-xl text-primary-100 mb-8">
-            Mulai pencarian lokasi Anda sekarang dan dapatkan penawaran terbaik
+            Start your location search now and get the best offer.
           </p>
           <button
             onClick={() => navigate('/results')}
             className="bg-white text-primary-600 hover:bg-gray-100 px-8 py-4 rounded-full font-bold text-lg transition-all hover:shadow-2xl"
           >
-            Mulai Sekarang
+            Get Started
           </button>
         </div>
       </section>

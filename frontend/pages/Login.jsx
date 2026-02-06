@@ -18,14 +18,15 @@ const Login = () => {
 
     // Simple validation
     if (!identifier || !password) {
-      setError('Username/Email dan password harus diisi');
+      setError('Username/Email and password are required');
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8001/api/auth/login', {
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      const response = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -50,11 +51,11 @@ const Login = () => {
         }
       } else {
         // Login failed
-        setError(data.error || 'Login gagal. Periksa kembali username/email dan password Anda.');
+        setError(data.error || 'Login failed. Please check your username/email and password.');
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError('Terjadi kesalahan. Silakan coba lagi.');
+      setError('An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -67,10 +68,10 @@ const Login = () => {
           {/* Header */}
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Masuk ke Netpoint
+              Sign in to Netpoint
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              Selamat datang kembali!
+              Welcome back!
             </p>
           </div>
 
@@ -95,7 +96,7 @@ const Login = () => {
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="admin atau admin@netpoint.com"
+                  placeholder="admin or admin@netpoint.com"
                 />
               </div>
             </div>
@@ -136,11 +137,11 @@ const Login = () => {
                   className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                 />
                 <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">
-                  Ingat saya
+                  Remember me
                 </span>
               </label>
               <a href="#" className="text-sm text-primary-600 dark:text-primary-400 hover:underline">
-                Lupa password?
+              Forgot password?
               </a>
             </div>
 
@@ -150,15 +151,15 @@ const Login = () => {
               disabled={loading}
               className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg font-semibold transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Memproses...' : 'Masuk'}
+              {loading ? 'Processing...' : 'Sign In'}
             </button>
           </form>
 
           {/* Sign Up Link */}
           <p className="text-center text-gray-600 dark:text-gray-400 mt-6">
-            Belum punya akun?{' '}
+            Don't have an account?{' '}
             <Link to="/register" className="text-primary-600 dark:text-primary-400 font-semibold hover:underline">
-              Daftar sekarang
+              Register now
             </Link>
           </p>
         </div>

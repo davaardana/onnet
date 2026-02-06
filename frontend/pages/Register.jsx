@@ -30,23 +30,23 @@ const Register = () => {
 
     // Validation
     if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-      setError('Semua field wajib diisi');
+      setError('All fields are required');
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Password tidak cocok');
+      setError('Passwords do not match');
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('Password minimal 6 karakter');
+      setError('Password must be at least 6 characters');
       return;
     }
 
     try {
       // Call backend register API
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
       const response = await fetch(`${apiUrl}/auth/register`, {
         method: 'POST',
         headers: {
@@ -63,7 +63,7 @@ const Register = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Registrasi gagal');
+        setError(data.error || 'Registration failed');
         return;
       }
 
@@ -74,7 +74,7 @@ const Register = () => {
       navigate('/');
     } catch (err) {
       console.error('Register error:', err);
-      setError('Terjadi kesalahan saat registrasi. Silakan coba lagi.');
+      setError('An error occurred during registration. Please try again.');
     }
   };
 
@@ -85,10 +85,10 @@ const Register = () => {
           {/* Header */}
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Daftar ke Netpoint
+              Sign up to Netpoint
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              Buat akun baru Anda
+              Create your new account
             </p>
           </div>
 
@@ -104,7 +104,7 @@ const Register = () => {
             {/* Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Nama Lengkap
+                Full Name
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -140,7 +140,7 @@ const Register = () => {
             {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Nomor Telepon
+                Phone Number
               </label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -183,7 +183,7 @@ const Register = () => {
             {/* Confirm Password */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Konfirmasi Password
+                Confirm Password
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -214,13 +214,13 @@ const Register = () => {
                 required
               />
               <label htmlFor="terms" className="ml-2 text-sm text-gray-600 dark:text-gray-400">
-                Saya setuju dengan{' '}
+                I agree to the{' '}
                 <a href="#" className="text-primary-600 hover:text-primary-700 dark:text-primary-400">
-                  Syarat & Ketentuan
+                  Terms & Conditions
                 </a>{' '}
                 dan{' '}
                 <a href="#" className="text-primary-600 hover:text-primary-700 dark:text-primary-400">
-                  Kebijakan Privasi
+                  Privacy Policy
                 </a>
               </label>
             </div>
@@ -230,14 +230,14 @@ const Register = () => {
               type="submit"
               className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-lg transition-all hover:shadow-lg"
             >
-              Daftar Sekarang
+              Sign Up Now
             </button>
 
             {/* Login Link */}
             <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-              Sudah punya akun?{' '}
+              Already have an account?{' '}
               <Link to="/login" className="text-primary-600 hover:text-primary-700 dark:text-primary-400 font-medium">
-                Masuk di sini
+                Sign in here
               </Link>
             </p>
           </form>

@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Users, Package, DollarSign, TrendingUp, 
-  MapPin, Clock, CheckCircle, XCircle,
-  AlertCircle, BarChart3
+  Clock, CheckCircle, XCircle,
+  AlertCircle, FileText, UserCheck
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -13,6 +13,11 @@ const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [datasets, setDatasets] = useState(null);
+  const [savingStatusId, setSavingStatusId] = useState(null);
+  const [buildingSearch, setBuildingSearch] = useState('');
+  const [buildingPage, setBuildingPage] = useState(1);
+  const buildingsPerPage = 50;
 
   useEffect(() => {
     // Check if user is admin
@@ -26,7 +31,8 @@ const AdminDashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('http://localhost:8001/api/admin/stats', {
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      const response = await fetch(`${apiUrl}/admin/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -35,11 +41,62 @@ const AdminDashboard = () => {
       if (response.ok) {
         const data = await response.json();
         setStats(data);
+        if (activeTab === 'data') {
+          await fetchDatasets();
+        }
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDatasets = async () => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      const offset = (buildingPage - 1) * buildingsPerPage;
+      const query = new URLSearchParams({
+        limit: buildingsPerPage.toString(),
+        offset: offset.toString(),
+        q: buildingSearch
+      });
+
+      const response = await fetch(`${apiUrl}/admin/datasets?${query.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      setDatasets(data);
+    } catch (err) {
+      console.error('Error fetching datasets:', err);
+    }
+  };
+
+  const updateOrderStatus = async (orderId, status) => {
+    try {
+      setSavingStatusId(orderId);
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      const response = await fetch(`${apiUrl}/admin/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status })
+      });
+
+      if (!response.ok) {
+        console.error('Failed to update order status');
+      } else {
+        await fetchStats();
+      }
+    } catch (err) {
+      console.error('Error updating status', err);
+    } finally {
+      setSavingStatusId(null);
     }
   };
 
@@ -52,7 +109,7 @@ const AdminDashboard = () => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('id-ID', {
+    return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -86,7 +143,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {/* Total Users */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
             <div className="flex items-center justify-between">
@@ -98,6 +155,21 @@ const AdminDashboard = () => {
               </div>
               <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
                 <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
+            </div>
+          </div>
+
+          {/* External Users */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">External Users</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
+                  {stats?.totalExternalUsers || 0}
+                </p>
+              </div>
+              <div className="bg-emerald-100 dark:bg-emerald-900 p-3 rounded-lg">
+                <UserCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
           </div>
@@ -146,6 +218,21 @@ const AdminDashboard = () => {
               </div>
             </div>
           </div>
+
+          {/* Quote Logs */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Quote Logs</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
+                  {stats?.quoteLogs?.length || 0}
+                </p>
+              </div>
+              <div className="bg-amber-100 dark:bg-amber-900 p-3 rounded-lg">
+                <FileText className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -181,6 +268,19 @@ const AdminDashboard = () => {
                 }`}
               >
                 Top Locations
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('data');
+                  fetchDatasets();
+                }}
+                className={`px-6 py-4 text-sm font-medium border-b-2 ${
+                  activeTab === 'data'
+                    ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                }`}
+              >
+                Data Explorer
               </button>
             </nav>
           </div>
@@ -264,13 +364,16 @@ const AdminDashboard = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           Date
                         </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {stats?.recentOrders?.map((order) => (
                         <tr key={order.id}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                            {order.order_number}
+                            #{order.id}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                             {order.user_name}
@@ -279,10 +382,10 @@ const AdminDashboard = () => {
                             {order.location_name}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                            {order.tier_name}
+                            {order.tier_name || `${order.bandwidth_mbps || '-'} Mbps ${order.service_type || ''}`}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                            {formatCurrency(order.monthly_price)}
+                            {order.monthly_price ? formatCurrency(order.monthly_price) : '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -299,6 +402,22 @@ const AdminDashboard = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                             {formatDate(order.created_at)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 space-x-2">
+                            <button
+                              onClick={() => updateOrderStatus(order.id, 'completed')}
+                              disabled={savingStatusId === order.id}
+                              className="px-3 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              Done
+                            </button>
+                            <button
+                              onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                              disabled={savingStatusId === order.id}
+                              className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                            >
+                              Delete
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -340,6 +459,211 @@ const AdminDashboard = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Data Explorer Tab */}
+            {activeTab === 'data' && (
+              <div className="space-y-8">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Price List (active)</h3>
+                    <span className="text-sm text-gray-500">{datasets?.priceList?.length || 0} rows</span>
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400">
+                        <tr>
+                          <th className="px-3 py-2 text-left">BW</th>
+                          <th className="px-3 py-2 text-left">Dom OTC</th>
+                          <th className="px-3 py-2 text-left">Dom Z1</th>
+                          <th className="px-3 py-2 text-left">Dom Z2</th>
+                          <th className="px-3 py-2 text-left">Dom Z3</th>
+                          <th className="px-3 py-2 text-left">Dom Z4</th>
+                          <th className="px-3 py-2 text-left">Intl OTC</th>
+                          <th className="px-3 py-2 text-left">Intl Z1</th>
+                          <th className="px-3 py-2 text-left">Intl Z2</th>
+                          <th className="px-3 py-2 text-left">Intl Z3</th>
+                          <th className="px-3 py-2 text-left">Intl Z4</th>
+                          <th className="px-3 py-2 text-left">DIA OTC</th>
+                          <th className="px-3 py-2 text-left">DIA MRC</th>
+                          <th className="px-3 py-2 text-left">IDIA OTC</th>
+                          <th className="px-3 py-2 text-left">IDIA MRC</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {datasets?.priceList?.map((p) => (
+                          <tr key={p.id}>
+                            <td className="px-3 py-2 text-gray-900 dark:text-white">{p.bandwidth_mbps} Mbps</td>
+                            <td className="px-3 py-2">{formatCurrency(p.domestic_otc)}</td>
+                            <td className="px-3 py-2">{formatCurrency(p.domestic_mrc_zone1)}</td>
+                            <td className="px-3 py-2">{formatCurrency(p.domestic_mrc_zone2)}</td>
+                            <td className="px-3 py-2">{formatCurrency(p.domestic_mrc_zone3)}</td>
+                            <td className="px-3 py-2">{formatCurrency(p.domestic_mrc_zone4)}</td>
+                            <td className="px-3 py-2">{formatCurrency(p.intl_otc)}</td>
+                            <td className="px-3 py-2">{formatCurrency(p.intl_mrc_zone1)}</td>
+                            <td className="px-3 py-2">{formatCurrency(p.intl_mrc_zone2)}</td>
+                            <td className="px-3 py-2">{formatCurrency(p.intl_mrc_zone3)}</td>
+                            <td className="px-3 py-2">{formatCurrency(p.intl_mrc_zone4)}</td>
+                            <td className="px-3 py-2">{formatCurrency(p.dia_otc)}</td>
+                            <td className="px-3 py-2">{formatCurrency(p.dia_mrc)}</td>
+                            <td className="px-3 py-2">{formatCurrency(p.idia_otc)}</td>
+                            <td className="px-3 py-2">{formatCurrency(p.idia_mrc)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-2">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Buildings</h3>
+                      <span className="text-sm text-gray-500">{datasets?.buildingsTotal || 0} total</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        value={buildingSearch}
+                        onChange={(e) => setBuildingSearch(e.target.value)}
+                        placeholder="Search name/address/city/zone..."
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                      />
+                      <button
+                        onClick={() => {
+                          setBuildingPage(1);
+                          fetchDatasets();
+                        }}
+                        className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm"
+                      >
+                        Search
+                      </button>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400">
+                        <tr>
+                          <th className="px-3 py-2 text-left">No</th>
+                          <th className="px-3 py-2 text-left">Name</th>
+                          <th className="px-3 py-2 text-left">Address</th>
+                          <th className="px-3 py-2 text-left">City</th>
+                          <th className="px-3 py-2 text-left">Zone</th>
+                          <th className="px-3 py-2 text-left">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {datasets?.buildings?.map((b, idx) => (
+                          <tr key={b.id}>
+                            <td className="px-3 py-2 text-gray-500">
+                              {(buildingPage - 1) * buildingsPerPage + idx + 1}
+                            </td>
+                            <td className="px-3 py-2 text-gray-900 dark:text-white">{b.building_name}</td>
+                            <td className="px-3 py-2">{b.address || '-'}</td>
+                            <td className="px-3 py-2">{b.city || '-'}</td>
+                            <td className="px-3 py-2">{b.zone || '-'}</td>
+                            <td className="px-3 py-2">{b.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center justify-between mt-3 text-sm text-gray-600 dark:text-gray-400">
+                    <div>
+                      Showing {datasets?.buildings?.length || 0} of {datasets?.buildingsTotal || 0}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          if (buildingPage > 1) {
+                            setBuildingPage(buildingPage - 1);
+                            fetchDatasets();
+                          }
+                        }}
+                        className="px-3 py-1 border rounded"
+                      >
+                        Prev
+                      </button>
+                      <span>Page {buildingPage}</span>
+                      <button
+                        onClick={() => {
+                          const maxPage = Math.ceil((datasets?.buildingsTotal || 0) / buildingsPerPage);
+                          if (buildingPage < maxPage) {
+                            setBuildingPage(buildingPage + 1);
+                            fetchDatasets();
+                          }
+                        }}
+                        className="px-3 py-1 border rounded"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Quote Logs</h3>
+                    <span className="text-sm text-gray-500">{datasets?.quoteLogs?.length || stats?.quoteLogs?.length || 0} rows</span>
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400">
+                        <tr>
+                          <th className="px-3 py-2 text-left">User</th>
+                          <th className="px-3 py-2 text-left">BW</th>
+                          <th className="px-3 py-2 text-left">Service</th>
+                          <th className="px-3 py-2 text-left">Zone</th>
+                          <th className="px-3 py-2 text-left">Source</th>
+                          <th className="px-3 py-2 text-left">OTC</th>
+                          <th className="px-3 py-2 text-left">MRC</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {(datasets?.quoteLogs || stats?.quoteLogs || []).map((q) => (
+                          <tr key={q.id}>
+                            <td className="px-3 py-2 text-gray-900 dark:text-white">{q.user_email || q.user_name || '-'}</td>
+                            <td className="px-3 py-2">{q.bandwidth_mbps} Mbps</td>
+                            <td className="px-3 py-2">{q.service_type}</td>
+                            <td className="px-3 py-2">{q.zone}</td>
+                            <td className="px-3 py-2">{q.source}</td>
+                            <td className="px-3 py-2">{formatCurrency(q.otc)}</td>
+                            <td className="px-3 py-2">{formatCurrency(q.mrc)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">External Users</h3>
+                    <span className="text-sm text-gray-500">{datasets?.usersExternal?.length || 0} rows</span>
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Name</th>
+                          <th className="px-3 py-2 text-left">Email</th>
+                          <th className="px-3 py-2 text-left">Phone</th>
+                          <th className="px-3 py-2 text-left">Created</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {datasets?.usersExternal?.map((u) => (
+                          <tr key={u.id}>
+                            <td className="px-3 py-2 text-gray-900 dark:text-white">{u.name}</td>
+                            <td className="px-3 py-2">{u.email}</td>
+                            <td className="px-3 py-2">{u.phone || '-'}</td>
+                            <td className="px-3 py-2">{formatDate(u.created_at)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
