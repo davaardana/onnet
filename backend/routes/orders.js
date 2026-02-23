@@ -27,8 +27,11 @@ router.post('/', authMiddleware, [
   body('tierId').optional().isInt(),
   body('bandwidth_mbps').optional().isInt(),
   body('service_type').optional().isString(),
+  body('service_category').optional().isString(),
   body('zone').optional().isString(),
   body('price_list_id').optional().isInt(),
+  body('a_end').optional().trim(),
+  body('b_end').optional().trim(),
   body('notes').optional().trim(),
   body('whatsapp_number').optional().trim(),
   body('source').optional().trim()
@@ -41,7 +44,8 @@ router.post('/', authMiddleware, [
 
     const { 
       locationName, tierId, locationId, notes, bandwidth_mbps,
-      service_type, zone, price_list_id, whatsapp_number, source
+      service_type, service_category, zone, price_list_id,
+      a_end, b_end, whatsapp_number, source
     } = req.body;
     const userId = req.user.userId;
 
@@ -55,9 +59,10 @@ router.post('/', authMiddleware, [
     const result = await db.query(
       `INSERT INTO orders (
          user_id, location_id, tier_id, location_name, notes, status,
-         bandwidth_mbps, service_type, zone, source, whatsapp_number
+         bandwidth_mbps, service_type, service_category, zone,
+         a_end, b_end, source, whatsapp_number
        )
-       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [
         userId,
@@ -67,7 +72,10 @@ router.post('/', authMiddleware, [
         notes || null,
         bandwidth_mbps || null,
         service_type || null,
+        service_category || null,
         zone || null,
+        a_end || null,
+        b_end || null,
         resolvedSource,
         whatsapp_number || null
       ]
@@ -89,7 +97,10 @@ router.get('/', authMiddleware, async (req, res) => {
     const userId = req.user.userId;
 
     const result = await db.query(
-      `SELECT o.*, pt.tier_name, pt.capacity, pt.monthly_price
+      `SELECT o.id, o.location_name, o.bandwidth_mbps, o.service_type, o.service_category,
+              o.zone, o.a_end, o.b_end, o.status, o.notes, o.source,
+              o.whatsapp_number, o.created_at,
+              pt.tier_name, pt.capacity, pt.monthly_price
        FROM orders o
        LEFT JOIN pricing_tiers pt ON o.tier_id = pt.id
        WHERE o.user_id = $1

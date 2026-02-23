@@ -42,7 +42,7 @@ const authLimiter = rateLimit({
 
 // CORS Configuration
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN || 'https://onnet.ticketingmosaik.com',
+  origin: process.env.CORS_ORIGIN || 'https://netpoint.id',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

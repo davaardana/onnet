@@ -6,14 +6,32 @@ import jsPDF from 'jspdf';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
+const SERVICE_LABELS = {
+  dia: 'Dedicated Internet Access (DIA)',
+  broadband: 'Broadband Internet',
+  metronet: 'Metro Ethernet Local Loop',
+  dc2dc: 'DC to DC Interconnection',
+  darkfiber: 'Dark Fiber',
+};
+
+const P2P_SERVICES = ['metronet', 'dc2dc', 'darkfiber'];
+
 const Results = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { isAuthenticated, token, user } = useAuth();
   const location = searchParams.get('location');
+  const aEnd = searchParams.get('aEnd') || location;
+  const bEnd = searchParams.get('bEnd') || '';
+  const serviceCategory = searchParams.get('serviceCategory') || '';
+  const reqBandwidth = searchParams.get('bandwidth') || '';
+  const isP2P = P2P_SERVICES.includes(serviceCategory);
+
   const [selectedTier, setSelectedTier] = useState(null);
   const [buildings, setBuildings] = useState([]);
+  const [bEndBuildings, setBEndBuildings] = useState([]);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
+  const [selectedBEndBuilding, setSelectedBEndBuilding] = useState(null);
   const [pricingData, setPricingData] = useState([]);
   const [serviceType, setServiceType] = useState('domestic');
   const [zone, setZone] = useState('Zone 1');
@@ -22,7 +40,13 @@ const Results = () => {
   const [info, setInfo] = useState('');
 
   const handleSelect = async (tier) => {
-    const message = encodeURIComponent(`Hi Netpoint, I'm interested in the ${tier.tier} package (${tier.serviceType}, ${tier.zone}) for location ${selectedBuilding?.building_name || location}. Please contact me.`);
+    const locLabel = isP2P
+      ? `A-End: ${aEnd} → B-End: ${bEnd}`
+      : (selectedBuilding?.building_name || location);
+    const svcLabel = SERVICE_LABELS[serviceCategory] || serviceCategory || 'Internet';
+    const message = encodeURIComponent(
+      `Hi Netpoint, I'm interested in ${svcLabel} – ${tier.tier} package (${tier.serviceType}, ${tier.zone}).\nLocation: ${locLabel}.\nPlease contact me.`
+    );
     const waLink = `https://wa.me/6288293673283?text=${message}`;
     setSelectedTier(tier);
     setInfo('Order recorded. Please download the PDF or continue via WhatsApp.');
@@ -35,12 +59,12 @@ const Results = () => {
 
     try {
       const payload = {
-        locationName: selectedBuilding?.building_name || location,
-        locationId: selectedBuilding?.id || null,
+        locationName: isP2P ? `${aEnd} → ${bEnd}` : (selectedBuilding?.building_name || location),
+        locationId: isP2P ? null : (selectedBuilding?.id || null),
         bandwidth_mbps: tier.bandwidth_mbps,
         service_type: tier.serviceType,
         zone: tier.zone,
-        notes: `User selected package ${tier.tier} from results page (${location})`,
+        notes: `[${SERVICE_LABELS[serviceCategory] || serviceCategory}] ${tier.tier} — A: ${aEnd || location}${bEnd ? ` B: ${bEnd}` : ''}`,
         whatsapp_number: user?.phone || null,
         source: 'results_page'
       };
@@ -70,13 +94,20 @@ const Results = () => {
     doc.text(`Date: ${new Date().toLocaleString('en-US')}`, 14, 26);
     doc.text(`Customer: ${user?.name || 'Registered User'}`, 14, 34);
 
-    const locLabel = selectedBuilding?.building_name || location || 'Location not specified';
-    doc.text(`Location: ${locLabel}`, 14, 42);
-    if (selectedBuilding?.address) doc.text(selectedBuilding.address, 14, 50, { maxWidth: 180 });
+    if (isP2P) {
+      doc.text(`Service: ${SERVICE_LABELS[serviceCategory] || serviceCategory}`, 14, 42);
+      doc.text(`A-End: ${aEnd || '-'}`, 14, 50);
+      doc.text(`B-End: ${bEnd || '-'}`, 14, 58);
+    } else {
+      doc.text(`Service: ${SERVICE_LABELS[serviceCategory] || 'Internet Service'}`, 14, 42);
+      const locLabel = selectedBuilding?.building_name || location || 'Location not specified';
+      doc.text(`Location: ${locLabel}`, 14, 50, { maxWidth: 180 });
+      if (selectedBuilding?.address) doc.text(selectedBuilding.address, 14, 58, { maxWidth: 180 });
+    }
 
     const lines = [
       `Bandwidth: ${tier.bandwidth_mbps || tier.tier}`,
-      `Service: ${tier.serviceType}`,
+      `Service Type: ${tier.serviceType}`,
       `Zone: ${tier.zone}`,
       `MRC: ${formatRupiah(tier.basePrice)}`,
       `OTC: ${formatRupiah(tier.otc)}`,
@@ -106,10 +137,16 @@ const Results = () => {
       setLoading(true);
       setError('');
       try {
-        const [bRes, pRes] = await Promise.all([
+        const requests = [
           fetch(`${API_BASE}/pricing/public/buildings?q=${encodeURIComponent(location)}&limit=5`),
-          fetch(`${API_BASE}/pricing/public/pricing?service_type=${serviceType}&zone=${encodeURIComponent(zone)}`)
-        ]);
+          fetch(`${API_BASE}/pricing/public/pricing?service_type=${serviceType}&zone=${encodeURIComponent(zone)}`),
+        ];
+        if (isP2P && bEnd) {
+          requests.push(fetch(`${API_BASE}/pricing/public/buildings?q=${encodeURIComponent(bEnd)}&limit=5`));
+        }
+
+        const results = await Promise.all(requests);
+        const [bRes, pRes, bEndRes] = results;
 
         if (!bRes.ok) throw new Error('Failed to fetch building data');
         if (!pRes.ok) throw new Error('Failed to fetch pricing data');
@@ -119,11 +156,17 @@ const Results = () => {
 
         const foundBuildings = buildingsJson.buildings || [];
         setBuildings(foundBuildings);
+
+        if (bEndRes) {
+          const bEndJson = await bEndRes.json();
+          const foundBEnd = bEndJson.buildings || [];
+          setBEndBuildings(foundBEnd);
+          if (!selectedBEndBuilding && foundBEnd.length) setSelectedBEndBuilding(foundBEnd[0]);
+        }
+
         if ((zone === 'Zone 1' || !zone) && foundBuildings.length) {
           const firstWithZone = foundBuildings.find((b) => b.zone)?.zone;
-          if (firstWithZone) {
-            setZone(firstWithZone);
-          }
+          if (firstWithZone) setZone(firstWithZone);
         }
         if (!selectedBuilding && foundBuildings.length) {
           setSelectedBuilding(foundBuildings[0]);
@@ -150,7 +193,7 @@ const Results = () => {
     };
 
     fetchData();
-  }, [location, serviceType, zone]);
+  }, [location, serviceType, zone, bEnd, isP2P]);
 
   const handleCustomRequest = () => {
     const message = encodeURIComponent(`Hello, I'd like to request a custom site survey for: ${location || 'a specific location'}`);
@@ -181,15 +224,35 @@ const Results = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="flex items-center justify-center mb-4">
+          <div className="flex items-center justify-center mb-2">
             <MapPin className="w-6 h-6 text-primary-600 dark:text-primary-400 mr-2" />
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
               Search Results
             </h1>
           </div>
-          <p className="text-xl text-gray-600 dark:text-gray-400">
-            Location: <span className="font-semibold">{location}</span>
-          </p>
+          {serviceCategory && (
+            <span className="inline-block bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 text-sm font-semibold px-4 py-1 rounded-full mb-3">
+              {SERVICE_LABELS[serviceCategory] || serviceCategory}
+            </span>
+          )}
+          {isP2P ? (
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 text-base text-gray-600 dark:text-gray-400">
+              <span className="font-semibold text-primary-600 dark:text-primary-400">A-End:</span>
+              <span>{aEnd}</span>
+              <span className="hidden sm:block text-gray-400">→</span>
+              <span className="font-semibold text-orange-500">B-End:</span>
+              <span>{bEnd}</span>
+            </div>
+          ) : (
+            <p className="text-xl text-gray-600 dark:text-gray-400">
+              Location: <span className="font-semibold">{location}</span>
+            </p>
+          )}
+          {reqBandwidth && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Requested: <span className="font-semibold">{reqBandwidth} Mbps</span>
+            </p>
+          )}
         </div>
 
         {/* Filter pricing */}
@@ -321,10 +384,22 @@ const Results = () => {
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">Your Order</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700 dark:text-gray-300">
-              <div><span className="font-semibold">Location:</span> {selectedBuilding?.building_name || location || '-'}</div>
-              <div><span className="font-semibold">Address:</span> {selectedBuilding?.address || 'N/A'}</div>
+              {serviceCategory && (
+                <div className="md:col-span-2"><span className="font-semibold">Service:</span> {SERVICE_LABELS[serviceCategory] || serviceCategory}</div>
+              )}
+              {isP2P ? (
+                <>
+                  <div><span className="font-semibold">A-End:</span> {aEnd || '-'}</div>
+                  <div><span className="font-semibold">B-End:</span> {bEnd || '-'}</div>
+                </>
+              ) : (
+                <>
+                  <div><span className="font-semibold">Location:</span> {selectedBuilding?.building_name || location || '-'}</div>
+                  <div><span className="font-semibold">Address:</span> {selectedBuilding?.address || 'N/A'}</div>
+                </>
+              )}
               <div><span className="font-semibold">Bandwidth:</span> {selectedTier.tier}</div>
-              <div><span className="font-semibold">Service:</span> {selectedTier.serviceType}</div>
+              <div><span className="font-semibold">Service Type:</span> {selectedTier.serviceType}</div>
               <div><span className="font-semibold">Zone:</span> {selectedTier.zone}</div>
               <div><span className="font-semibold">MRC:</span> {formatRupiah(selectedTier.basePrice)}</div>
               <div><span className="font-semibold">OTC:</span> {formatRupiah(selectedTier.otc)}</div>
@@ -351,7 +426,9 @@ const Results = () => {
         <div className="max-w-5xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
           <div className="flex items-center mb-4">
             <MapPin className="w-5 h-5 text-primary-600 dark:text-primary-400 mr-2" />
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Building Results</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              {isP2P ? 'A-End Building Results' : 'Building Results'}
+            </h3>
           </div>
           {loading ? (
             <div className="text-gray-500 dark:text-gray-400">Loading data...</div>
@@ -373,6 +450,35 @@ const Results = () => {
             </ul>
           )}
         </div>
+
+        {/* B-End Building results (P2P only) */}
+        {isP2P && bEnd && (
+          <div className="max-w-5xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mt-4">
+            <div className="flex items-center mb-4">
+              <MapPin className="w-5 h-5 text-orange-500 mr-2" />
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">B-End Building Results</h3>
+            </div>
+            {loading ? (
+              <div className="text-gray-500 dark:text-gray-400">Loading data...</div>
+            ) : bEndBuildings.length === 0 ? (
+              <div className="text-gray-500 dark:text-gray-400">No buildings found for B-End keyword.</div>
+            ) : (
+              <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                {bEndBuildings.map((b) => (
+                  <li
+                    key={b.id}
+                    onClick={() => setSelectedBEndBuilding(b)}
+                    className={`py-3 cursor-pointer ${selectedBEndBuilding?.id === b.id ? 'bg-orange-50 dark:bg-orange-900/30 rounded-lg px-3' : ''}`}
+                  >
+                    <div className="font-semibold text-gray-900 dark:text-white">{b.building_name}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">{b.address}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-500">{b.city || 'N/A'} • {b.zone || 'Zone ?'}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         
         {/* Custom Request Section */}
         <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 shadow-lg mt-8">

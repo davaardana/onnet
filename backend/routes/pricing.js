@@ -4,11 +4,38 @@ const db = require('../config/database');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 
 // Helper: calculate price by service type and zone
+const P2P_SERVICE_TYPES = ['metronet', 'dc2dc', 'darkfiber'];
+
 const calculatePrice = (priceRow, serviceType, zone) => {
   let otc;
   let mrc;
 
   const validZones = ['Zone 1', 'Zone 2', 'Zone 3', 'Zone 4'];
+
+  // P2P services: use dedicated columns (may be null = custom quote)
+  if (P2P_SERVICE_TYPES.includes(serviceType)) {
+    switch (serviceType) {
+      case 'metronet':
+        otc = priceRow.metronet_otc;
+        if (zone === 'Zone 1') mrc = priceRow.metronet_mrc_zone1;
+        else if (zone === 'Zone 2') mrc = priceRow.metronet_mrc_zone2;
+        else if (zone === 'Zone 3') mrc = priceRow.metronet_mrc_zone3;
+        else if (zone === 'Zone 4') mrc = priceRow.metronet_mrc_zone4;
+        else mrc = priceRow.metronet_mrc_zone1;
+        break;
+      case 'dc2dc':
+        otc = priceRow.dc2dc_otc;
+        mrc = priceRow.dc2dc_mrc;
+        break;
+      case 'darkfiber':
+        otc = priceRow.darkfiber_otc;
+        mrc = priceRow.darkfiber_mrc_per_core;
+        break;
+    }
+    // null is valid for P2P — means "custom quote"
+    return { otc: otc ?? null, mrc: mrc ?? null };
+  }
+
   if (!validZones.includes(zone)) {
     throw new Error('Invalid zone');
   }
@@ -64,16 +91,30 @@ router.get('/public/pricing', async (req, res) => {
     );
 
     const pricing = rows.map((row) => {
-      const { otc, mrc } = calculatePrice(row, service_type, zone);
-      return {
-        id: row.id,
-        bandwidth_mbps: row.bandwidth_mbps,
-        service_type,
-        zone,
-        otc,
-        mrc,
-        year: row.year
-      };
+      try {
+        const { otc, mrc } = calculatePrice(row, service_type, zone);
+        return {
+          id: row.id,
+          bandwidth_mbps: row.bandwidth_mbps,
+          service_type,
+          zone,
+          otc,
+          mrc,
+          is_custom: otc === null || mrc === null,
+          year: row.year
+        };
+      } catch {
+        return {
+          id: row.id,
+          bandwidth_mbps: row.bandwidth_mbps,
+          service_type,
+          zone,
+          otc: null,
+          mrc: null,
+          is_custom: true,
+          year: row.year
+        };
+      }
     });
 
     res.json({ pricing });

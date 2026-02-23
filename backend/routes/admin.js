@@ -88,7 +88,10 @@ router.get('/stats', authMiddleware, isAdmin, async (req, res) => {
         o.created_at,
         o.bandwidth_mbps,
         o.service_type,
+        o.service_category,
         o.zone,
+        o.a_end,
+        o.b_end,
         o.source,
         o.whatsapp_number,
         u.name as user_name,
@@ -185,6 +188,9 @@ router.get('/datasets', authMiddleware, isAdmin, async (req, res) => {
               intl_otc, intl_mrc_zone1, intl_mrc_zone2, intl_mrc_zone3, intl_mrc_zone4,
               dia_otc, dia_mrc,
               idia_otc, idia_mrc,
+              metronet_otc, metronet_mrc_zone1, metronet_mrc_zone2, metronet_mrc_zone3, metronet_mrc_zone4,
+              dc2dc_otc, dc2dc_mrc,
+              darkfiber_otc, darkfiber_mrc_per_core,
               year, status
          FROM price_list
          WHERE status = 'active'
@@ -290,7 +296,10 @@ router.get('/orders', authMiddleware, isAdmin, async (req, res) => {
         o.updated_at,
         o.bandwidth_mbps,
         o.service_type,
+        o.service_category,
         o.zone,
+        o.a_end,
+        o.b_end,
         o.source,
         o.whatsapp_number,
         u.name as user_name,

@@ -22,8 +22,8 @@ router.get('/buildings', isAuthenticated, isAdmin, async (req, res) => {
     }
     
     if (zone) {
-      query += ` AND zone_code = $${paramIndex}`;
-      countQuery += ` AND zone_code = $${paramIndex}`;
+      query += ` AND zone = $${paramIndex}`;
+      countQuery += ` AND zone = $${paramIndex}`;
       params.push(zone);
       paramIndex++;
     }
@@ -71,13 +71,17 @@ router.get('/buildings/:id', isAuthenticated, isAdmin, async (req, res) => {
 // Create building
 router.post('/buildings', isAuthenticated, isAdmin, async (req, res) => {
   try {
-    const { building_name, address, zone_code, zone_name, zone_number, zone_details } = req.body;
+    const { building_name, address, zone, city, country, status } = req.body;
     
+    if (!building_name || !address) {
+      return res.status(400).json({ error: 'building_name and address are required' });
+    }
+
     const result = await db.query(
-      `INSERT INTO buildings (building_name, address, zone_code, zone_name, zone_number, zone_details) 
+      `INSERT INTO buildings (building_name, address, zone, city, country, status) 
        VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING *`,
-      [building_name, address, zone_code, zone_name, zone_number, zone_details]
+      [building_name, address, zone || null, city || null, country || 'Indonesia', status || 'active']
     );
     
     res.status(201).json(result.rows[0]);
@@ -91,15 +95,15 @@ router.post('/buildings', isAuthenticated, isAdmin, async (req, res) => {
 router.put('/buildings/:id', isAuthenticated, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { building_name, address, zone_code, zone_name, zone_number, zone_details, status } = req.body;
+    const { building_name, address, zone, city, country, status } = req.body;
     
     const result = await db.query(
       `UPDATE buildings 
-       SET building_name = $1, address = $2, zone_code = $3, zone_name = $4, 
-           zone_number = $5, zone_details = $6, status = $7
-       WHERE id = $8 
+       SET building_name = $1, address = $2, zone = $3, city = $4,
+           country = $5, status = $6, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $7 
        RETURNING *`,
-      [building_name, address, zone_code, zone_name, zone_number, zone_details, status, id]
+      [building_name, address, zone, city || null, country || 'Indonesia', status || 'active', id]
     );
     
     if (result.rows.length === 0) {
@@ -144,21 +148,20 @@ router.post('/buildings/bulk', isAuthenticated, isAdmin, async (req, res) => {
     }
     
     const values = buildings.map((b, i) => {
-      const base = i * 6;
-      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`;
+      const base = i * 5;
+      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
     }).join(',');
     
     const params = buildings.flatMap(b => [
       b.building_name,
       b.address,
-      b.zone_code || null,
-      b.zone_name || null,
-      b.zone_number || null,
-      b.zone_details || null
+      b.zone || null,
+      b.city || null,
+      b.country || 'Indonesia'
     ]);
     
     const query = `
-      INSERT INTO buildings (building_name, address, zone_code, zone_name, zone_number, zone_details)
+      INSERT INTO buildings (building_name, address, zone, city, country)
       VALUES ${values}
       ON CONFLICT DO NOTHING
     `;
@@ -221,8 +224,10 @@ router.post('/pricing', isAuthenticated, isAdmin, async (req, res) => {
         bandwidth_mbps, domestic_otc, domestic_mrc_zone1, domestic_mrc_zone2, 
         domestic_mrc_zone3, domestic_mrc_zone4, intl_otc, intl_mrc_zone1, 
         intl_mrc_zone2, intl_mrc_zone3, intl_mrc_zone4, dia_otc, dia_mrc,
-        idia_bw, idia_otc, idia_mrc, year
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        idia_bw, idia_otc, idia_mrc,
+        metronet_otc, metronet_mrc_zone1, metronet_mrc_zone2, metronet_mrc_zone3, metronet_mrc_zone4,
+        dc2dc_otc, dc2dc_mrc, darkfiber_otc, darkfiber_mrc_per_core, year
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
       ON CONFLICT (bandwidth_mbps, year) 
       DO UPDATE SET
         domestic_otc = EXCLUDED.domestic_otc,
@@ -239,7 +244,16 @@ router.post('/pricing', isAuthenticated, isAdmin, async (req, res) => {
         dia_mrc = EXCLUDED.dia_mrc,
         idia_bw = EXCLUDED.idia_bw,
         idia_otc = EXCLUDED.idia_otc,
-        idia_mrc = EXCLUDED.idia_mrc
+        idia_mrc = EXCLUDED.idia_mrc,
+        metronet_otc = EXCLUDED.metronet_otc,
+        metronet_mrc_zone1 = EXCLUDED.metronet_mrc_zone1,
+        metronet_mrc_zone2 = EXCLUDED.metronet_mrc_zone2,
+        metronet_mrc_zone3 = EXCLUDED.metronet_mrc_zone3,
+        metronet_mrc_zone4 = EXCLUDED.metronet_mrc_zone4,
+        dc2dc_otc = EXCLUDED.dc2dc_otc,
+        dc2dc_mrc = EXCLUDED.dc2dc_mrc,
+        darkfiber_otc = EXCLUDED.darkfiber_otc,
+        darkfiber_mrc_per_core = EXCLUDED.darkfiber_mrc_per_core
       RETURNING *`,
       [
         price.bandwidth_mbps, price.domestic_otc, price.domestic_mrc_zone1,
@@ -247,6 +261,11 @@ router.post('/pricing', isAuthenticated, isAdmin, async (req, res) => {
         price.intl_otc, price.intl_mrc_zone1, price.intl_mrc_zone2,
         price.intl_mrc_zone3, price.intl_mrc_zone4, price.dia_otc,
         price.dia_mrc, price.idia_bw, price.idia_otc, price.idia_mrc,
+        price.metronet_otc || null, price.metronet_mrc_zone1 || null,
+        price.metronet_mrc_zone2 || null, price.metronet_mrc_zone3 || null,
+        price.metronet_mrc_zone4 || null,
+        price.dc2dc_otc || null, price.dc2dc_mrc || null,
+        price.darkfiber_otc || null, price.darkfiber_mrc_per_core || null,
         price.year || 2026
       ]
     );
@@ -273,8 +292,10 @@ router.post('/pricing/bulk', isAuthenticated, isAdmin, async (req, res) => {
           bandwidth_mbps, domestic_otc, domestic_mrc_zone1, domestic_mrc_zone2, 
           domestic_mrc_zone3, domestic_mrc_zone4, intl_otc, intl_mrc_zone1, 
           intl_mrc_zone2, intl_mrc_zone3, intl_mrc_zone4, dia_otc, dia_mrc,
-          idia_bw, idia_otc, idia_mrc, year
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+          idia_bw, idia_otc, idia_mrc,
+          metronet_otc, metronet_mrc_zone1, metronet_mrc_zone2, metronet_mrc_zone3, metronet_mrc_zone4,
+          dc2dc_otc, dc2dc_mrc, darkfiber_otc, darkfiber_mrc_per_core, year
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
         ON CONFLICT (bandwidth_mbps, year) DO NOTHING`,
         [
           price.bandwidth_mbps, price.domestic_otc, price.domestic_mrc_zone1,
@@ -282,6 +303,11 @@ router.post('/pricing/bulk', isAuthenticated, isAdmin, async (req, res) => {
           price.intl_otc, price.intl_mrc_zone1, price.intl_mrc_zone2,
           price.intl_mrc_zone3, price.intl_mrc_zone4, price.dia_otc,
           price.dia_mrc, price.idia_bw, price.idia_otc, price.idia_mrc,
+          price.metronet_otc || null, price.metronet_mrc_zone1 || null,
+          price.metronet_mrc_zone2 || null, price.metronet_mrc_zone3 || null,
+          price.metronet_mrc_zone4 || null,
+          price.dc2dc_otc || null, price.dc2dc_mrc || null,
+          price.darkfiber_otc || null, price.darkfiber_mrc_per_core || null,
           price.year || 2026
         ]
       );
@@ -316,7 +342,9 @@ router.post('/quote/calculate', isAuthenticated, isAdmin, async (req, res) => {
     
     const buildingData = building.rows[0];
     const priceData = pricing.rows[0];
-    const zone = buildingData.zone_number || 1;
+    // zone stored as "Zone 1", "Zone 2", etc. — extract number for calc
+    const zoneStr = buildingData.zone || 'Zone 1';
+    const zoneNum = parseInt(zoneStr.replace(/\D/g, '')) || 1;
     
     let otc = 0;
     let mrc = 0;
@@ -324,29 +352,41 @@ router.post('/quote/calculate', isAuthenticated, isAdmin, async (req, res) => {
     // Calculate based on service type and zone
     if (service_type === 'domestic') {
       otc = parseFloat(priceData.domestic_otc || 0);
-      if (zone === 1) mrc = parseFloat(priceData.domestic_mrc_zone1 || 0);
-      else if (zone === 2) mrc = parseFloat(priceData.domestic_mrc_zone2 || 0);
-      else if (zone === 3) mrc = parseFloat(priceData.domestic_mrc_zone3 || 0);
-      else if (zone === 4) mrc = parseFloat(priceData.domestic_mrc_zone4 || 0);
+      if (zoneNum === 1) mrc = parseFloat(priceData.domestic_mrc_zone1 || 0);
+      else if (zoneNum === 2) mrc = parseFloat(priceData.domestic_mrc_zone2 || 0);
+      else if (zoneNum === 3) mrc = parseFloat(priceData.domestic_mrc_zone3 || 0);
+      else if (zoneNum === 4) mrc = parseFloat(priceData.domestic_mrc_zone4 || 0);
     } else if (service_type === 'international') {
       otc = parseFloat(priceData.intl_otc || 0);
-      if (zone === 1) mrc = parseFloat(priceData.intl_mrc_zone1 || 0);
-      else if (zone === 2) mrc = parseFloat(priceData.intl_mrc_zone2 || 0);
-      else if (zone === 3) mrc = parseFloat(priceData.intl_mrc_zone3 || 0);
-      else if (zone === 4) mrc = parseFloat(priceData.intl_mrc_zone4 || 0);
-    } else if (service_type === 'dia') {
+      if (zoneNum === 1) mrc = parseFloat(priceData.intl_mrc_zone1 || 0);
+      else if (zoneNum === 2) mrc = parseFloat(priceData.intl_mrc_zone2 || 0);
+      else if (zoneNum === 3) mrc = parseFloat(priceData.intl_mrc_zone3 || 0);
+      else if (zoneNum === 4) mrc = parseFloat(priceData.intl_mrc_zone4 || 0);
+    } else if (service_type === 'dia' || service_type === 'dia_premium') {
       otc = parseFloat(priceData.dia_otc || 0);
       mrc = parseFloat(priceData.dia_mrc || 0);
     } else if (service_type === 'idia') {
       otc = parseFloat(priceData.idia_otc || 0);
       mrc = parseFloat(priceData.idia_mrc || 0);
+    } else if (service_type === 'metronet') {
+      otc = parseFloat(priceData.metronet_otc || 0);
+      if (zoneNum === 1) mrc = parseFloat(priceData.metronet_mrc_zone1 || 0);
+      else if (zoneNum === 2) mrc = parseFloat(priceData.metronet_mrc_zone2 || 0);
+      else if (zoneNum === 3) mrc = parseFloat(priceData.metronet_mrc_zone3 || 0);
+      else if (zoneNum === 4) mrc = parseFloat(priceData.metronet_mrc_zone4 || 0);
+    } else if (service_type === 'dc2dc') {
+      otc = parseFloat(priceData.dc2dc_otc || 0);
+      mrc = parseFloat(priceData.dc2dc_mrc || 0);
+    } else if (service_type === 'darkfiber') {
+      otc = parseFloat(priceData.darkfiber_otc || 0);
+      mrc = parseFloat(priceData.darkfiber_mrc_per_core || 0);
     }
     
     res.json({
       building: buildingData,
       bandwidth_mbps,
       service_type,
-      zone,
+      zone: zoneStr,
       otc,
       mrc,
       total_first_month: otc + mrc,

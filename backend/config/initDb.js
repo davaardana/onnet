@@ -59,7 +59,10 @@ const initDatabase = async () => {
         location_name VARCHAR(255) NOT NULL,
         bandwidth_mbps INTEGER,
         service_type VARCHAR(50),
+        service_category VARCHAR(50),
         zone VARCHAR(50),
+        a_end TEXT,
+        b_end TEXT,
         status VARCHAR(50) DEFAULT 'pending',
         notes TEXT,
         source VARCHAR(50),
@@ -68,6 +71,11 @@ const initDatabase = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Migrate orders: add new columns if upgrading existing DB
+    await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_category VARCHAR(50)`);
+    await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS a_end TEXT`);
+    await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS b_end TEXT`);
 
     // Price list table (price book 2026)
     await db.query(`
@@ -89,12 +97,32 @@ const initDatabase = async () => {
         idia_bw INTEGER,
         idia_otc DECIMAL(15,2),
         idia_mrc DECIMAL(15,2),
+        metronet_otc DECIMAL(15,2),
+        metronet_mrc_zone1 DECIMAL(15,2),
+        metronet_mrc_zone2 DECIMAL(15,2),
+        metronet_mrc_zone3 DECIMAL(15,2),
+        metronet_mrc_zone4 DECIMAL(15,2),
+        dc2dc_otc DECIMAL(15,2),
+        dc2dc_mrc DECIMAL(15,2),
+        darkfiber_otc DECIMAL(15,2),
+        darkfiber_mrc_per_core DECIMAL(15,2),
         year INTEGER DEFAULT 2026,
         status VARCHAR(50) DEFAULT 'active',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Migrate price_list: add new service columns if upgrading existing DB
+    await db.query(`ALTER TABLE price_list ADD COLUMN IF NOT EXISTS metronet_otc DECIMAL(15,2)`);
+    await db.query(`ALTER TABLE price_list ADD COLUMN IF NOT EXISTS metronet_mrc_zone1 DECIMAL(15,2)`);
+    await db.query(`ALTER TABLE price_list ADD COLUMN IF NOT EXISTS metronet_mrc_zone2 DECIMAL(15,2)`);
+    await db.query(`ALTER TABLE price_list ADD COLUMN IF NOT EXISTS metronet_mrc_zone3 DECIMAL(15,2)`);
+    await db.query(`ALTER TABLE price_list ADD COLUMN IF NOT EXISTS metronet_mrc_zone4 DECIMAL(15,2)`);
+    await db.query(`ALTER TABLE price_list ADD COLUMN IF NOT EXISTS dc2dc_otc DECIMAL(15,2)`);
+    await db.query(`ALTER TABLE price_list ADD COLUMN IF NOT EXISTS dc2dc_mrc DECIMAL(15,2)`);
+    await db.query(`ALTER TABLE price_list ADD COLUMN IF NOT EXISTS darkfiber_otc DECIMAL(15,2)`);
+    await db.query(`ALTER TABLE price_list ADD COLUMN IF NOT EXISTS darkfiber_mrc_per_core DECIMAL(15,2)`);
 
     await db.query(`CREATE INDEX IF NOT EXISTS idx_price_bandwidth_year ON price_list(bandwidth_mbps, year);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_price_status ON price_list(status);`);
@@ -105,9 +133,12 @@ const initDatabase = async () => {
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         source VARCHAR(50) NOT NULL,
-        bandwidth_mbps INTEGER NOT NULL,
-        service_type VARCHAR(50) NOT NULL,
+        bandwidth_mbps INTEGER,
+        service_type VARCHAR(50) NOT NULL DEFAULT 'domestic',
+        service_category VARCHAR(50),
         zone VARCHAR(50),
+        a_end TEXT,
+        b_end TEXT,
         price_list_id INTEGER,
         building_id INTEGER REFERENCES buildings(id) ON DELETE SET NULL,
         building_name VARCHAR(255),
@@ -122,6 +153,11 @@ const initDatabase = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Migrate quote_logs: add new columns if upgrading existing DB
+    await db.query(`ALTER TABLE quote_logs ADD COLUMN IF NOT EXISTS service_category VARCHAR(50)`);
+    await db.query(`ALTER TABLE quote_logs ADD COLUMN IF NOT EXISTS a_end TEXT`);
+    await db.query(`ALTER TABLE quote_logs ADD COLUMN IF NOT EXISTS b_end TEXT`);
 
     await db.query(`CREATE INDEX IF NOT EXISTS idx_quote_logs_status ON quote_logs(status);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_quote_logs_user ON quote_logs(user_id);`);
