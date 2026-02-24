@@ -43,7 +43,7 @@ const Login = () => {
 
       if (response.ok) {
         // Pass remember flag — true = localStorage, false = sessionStorage
-        login(data.user, data.token, remember);
+        login(data.user, data.token, data.refreshToken, remember);
 
         // Redirect based on role
         if (data.user.role === 'admin') {

@@ -21,8 +21,8 @@ pool.on('connect', () => {
 });
 
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  // Log error but do NOT kill the process — transient DB errors should not crash the server
+  console.error('Unexpected error on idle client:', err.message);
 });
 
 module.exports = {

@@ -124,54 +124,6 @@ router.get('/public/pricing', async (req, res) => {
   }
 });
 
-// Public quote calculator (no auth) for FE
-router.post('/public/quote', async (req, res) => {
-  try {
-    const { bandwidth_mbps, service_type = 'domestic', zone, year = 2026, building_id } = req.body;
-
-    if (!bandwidth_mbps) {
-      return res.status(400).json({ error: 'Bandwidth is required' });
-    }
-
-    let resolvedZone = zone;
-
-    // If building is provided, try to use its zone
-    if (building_id) {
-      const b = await db.query('SELECT zone, building_name FROM buildings WHERE id = $1', [building_id]);
-      if (b.rows.length > 0 && b.rows[0].zone) {
-        resolvedZone = b.rows[0].zone;
-      }
-    }
-
-    if (!resolvedZone) {
-      resolvedZone = 'Zone 1';
-    }
-
-    const priceResult = await db.query(
-      'SELECT * FROM price_list WHERE bandwidth_mbps = $1 AND year = $2 AND status = $3',
-      [bandwidth_mbps, year, 'active']
-    );
-
-    if (priceResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Pricing not found for specified bandwidth' });
-    }
-
-    const { otc, mrc } = calculatePrice(priceResult.rows[0], service_type, resolvedZone);
-
-    res.json({
-      bandwidth_mbps,
-      service_type,
-      zone: resolvedZone,
-      otc,
-      mrc,
-      year
-    });
-  } catch (error) {
-    console.error('Error calculating public quote:', error.message || error);
-    res.status(400).json({ error: error.message || 'Failed to calculate quote' });
-  }
-});
-
 // ============================================
 // BUILDINGS ROUTES
 // ============================================

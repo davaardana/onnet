@@ -74,12 +74,17 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Netpoint API is running' });
 });
 
-// Error handling middleware
+// 404 handler for unknown routes
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+// Error handling middleware — never expose internal errors in production
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ 
-    error: 'Something went wrong!',
-    message: err.message 
+  const isProd = process.env.NODE_ENV === 'production';
+  res.status(err.status || 500).json({
+    error: isProd ? 'Something went wrong!' : (err.message || 'Internal Server Error')
   });
 });
 

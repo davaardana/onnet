@@ -1,29 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, adminMiddleware } = require('../middleware/auth');
+const { recordAudit } = require('../utils/audit');
 const db = require('../config/database');
 
-// Middleware to check if user is admin
-const isAdmin = async (req, res, next) => {
-  try {
-    const result = await db.query(
-      'SELECT role FROM users WHERE id = $1',
-      [req.user.userId]
-    );
-
-    if (result.rows.length === 0 || result.rows[0].role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied. Admin only.' });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Admin check error:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-
 // Get dashboard statistics
-router.get('/stats', authMiddleware, isAdmin, async (req, res) => {
+router.get('/stats', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     // Total users
     const usersResult = await db.query('SELECT COUNT(*) as count FROM users');
@@ -61,7 +43,7 @@ router.get('/stats', authMiddleware, isAdmin, async (req, res) => {
       SELECT 
         COALESCE(SUM(pt.monthly_price), 0) as total_revenue
       FROM orders o
-      JOIN pricing_tiers pt ON o.tier_id = pt.id
+      LEFT JOIN pricing_tiers pt ON o.tier_id = pt.id
       WHERE o.status = 'completed'
     `);
     const totalRevenue = parseInt(revenueResult.rows[0].total_revenue || 0);
@@ -70,9 +52,9 @@ router.get('/stats', authMiddleware, isAdmin, async (req, res) => {
     const monthlyRevenueResult = await db.query(`
       SELECT 
         DATE_TRUNC('month', o.created_at) as month,
-        SUM(pt.monthly_price) as revenue
+        COALESCE(SUM(pt.monthly_price), 0) as revenue
       FROM orders o
-      JOIN pricing_tiers pt ON o.tier_id = pt.id
+      LEFT JOIN pricing_tiers pt ON o.tier_id = pt.id
       WHERE o.status = 'completed'
         AND o.created_at >= NOW() - INTERVAL '6 months'
       GROUP BY DATE_TRUNC('month', o.created_at)
@@ -151,7 +133,7 @@ router.get('/stats', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // Admin data explorer: returns paged datasets for FE tables
-router.get('/datasets', authMiddleware, isAdmin, async (req, res) => {
+router.get('/datasets', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
@@ -247,7 +229,7 @@ router.get('/datasets', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // Get all users
-router.get('/users', authMiddleware, isAdmin, async (req, res) => {
+router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -280,7 +262,7 @@ router.get('/users', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // Get all orders (admin view)
-router.get('/orders', authMiddleware, isAdmin, async (req, res) => {
+router.get('/orders', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -351,7 +333,7 @@ router.get('/orders', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // Update order status (admin only)
-router.put('/orders/:id/status', authMiddleware, isAdmin, async (req, res) => {
+router.put('/orders/:id/status', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, notes } = req.body;
@@ -373,6 +355,8 @@ router.put('/orders/:id/status', authMiddleware, isAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Order not found' });
     }
 
+    recordAudit(req.user.userId, 'update_order_status', 'orders', { orderId: id, newStatus: status, notes }, req);
+
     res.json({
       message: 'Order updated successfully',
       order: result.rows[0]
@@ -384,7 +368,7 @@ router.put('/orders/:id/status', authMiddleware, isAdmin, async (req, res) => {
 });
 
 // Update user role
-router.put('/users/:id/role', authMiddleware, isAdmin, async (req, res) => {
+router.put('/users/:id/role', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { role } = req.body;

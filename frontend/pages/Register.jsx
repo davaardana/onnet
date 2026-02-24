@@ -68,7 +68,7 @@ const Register = () => {
       }
 
       // Save user and token
-      register(data.user, data.token);
+      register(data.user, data.token, data.refreshToken);
 
       // Navigate to home
       navigate('/');

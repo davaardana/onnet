@@ -8,7 +8,7 @@ const db = require('../config/database');
 const { recordAudit } = require('../utils/audit');
 const { authMiddleware } = require('../middleware/auth');
 
-const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '7d';
+const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '2h';
 const REFRESH_TOKEN_DAYS = parseInt(process.env.REFRESH_TOKEN_DAYS || '30', 10);
 
 const signAccessToken = (user) => jwt.sign(
@@ -60,7 +60,7 @@ router.post('/register', [
 
     // Check if user exists
     const userExists = await db.query(
-      'SELECT * FROM users WHERE email = $1',
+      'SELECT id FROM users WHERE email = $1',
       [email]
     );
 
@@ -206,6 +206,27 @@ router.post('/refresh', [
   } catch (error) {
     console.error('Refresh token error:', error);
     res.status(500).json({ error: 'Server error during token refresh' });
+  }
+});
+
+// Logout - revoke refresh token from DB so it cannot be reused
+router.post('/logout', authMiddleware, async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (refreshToken) {
+      const incomingHash = hashToken(refreshToken);
+      await db.query(
+        `UPDATE refresh_tokens
+         SET revoked_at = NOW()
+         WHERE token_hash = $1 AND user_id = $2 AND revoked_at IS NULL`,
+        [incomingHash, req.user.userId]
+      );
+    }
+    recordAudit(req.user.userId, 'logout', 'auth', {}, req);
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ error: 'Server error during logout' });
   }
 });
 
