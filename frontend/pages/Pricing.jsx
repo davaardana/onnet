@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function PricingPage() {
   const [buildings, setBuildings] = useState([]);
@@ -16,25 +17,22 @@ export default function PricingPage() {
   const [zone, setZone] = useState('Zone 1');
 
   const navigate = useNavigate();
+  const { user, token, isAuthenticated } = useAuth();
   const apiUrl = import.meta.env.VITE_API_URL || '/api';
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-
-    if (!token || user.role !== 'admin') {
+    if (!isAuthenticated || user?.role !== 'admin') {
       navigate('/login');
       return;
     }
 
     fetchBuildings();
     fetchPricing();
-  }, []);
+  }, [isAuthenticated, user]);
 
   const fetchBuildings = async (search = '') => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const url = search 
         ? `${apiUrl}/pricing/buildings?search=${encodeURIComponent(search)}&limit=100`
         : `${apiUrl}/pricing/buildings?limit=100`;
@@ -59,7 +57,6 @@ export default function PricingPage() {
 
   const fetchPricing = async () => {
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${apiUrl}/pricing/pricing`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -88,7 +85,6 @@ export default function PricingPage() {
     setQuote(null);
 
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${apiUrl}/pricing/quote`, {
         method: 'POST',
         headers: {

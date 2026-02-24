@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Lock, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, X, MessageCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(true);
+  const [showForgotModal, setShowForgotModal] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -40,9 +42,9 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Login successful
-        login(data.user, data.token);
-        
+        // Pass remember flag — true = localStorage, false = sessionStorage
+        login(data.user, data.token, remember);
+
         // Redirect based on role
         if (data.user.role === 'admin') {
           navigate('/admin');
@@ -50,7 +52,6 @@ const Login = () => {
           navigate('/');
         }
       } else {
-        // Login failed
         setError(data.error || 'Login failed. Please check your username/email and password.');
       }
     } catch (err) {
@@ -96,7 +97,7 @@ const Login = () => {
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="admin or admin@netpoint.com"
+                  placeholder="Username or Email"
                 />
               </div>
             </div>
@@ -131,18 +132,24 @@ const Login = () => {
 
             {/* Remember & Forgot */}
             <div className="flex items-center justify-between">
-              <label className="flex items-center">
+              <label className="flex items-center cursor-pointer select-none">
                 <input
                   type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
                   className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                 />
                 <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">
                   Remember me
                 </span>
               </label>
-              <a href="#" className="text-sm text-primary-600 dark:text-primary-400 hover:underline">
-              Forgot password?
-              </a>
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(true)}
+                className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+              >
+                Forgot password?
+              </button>
             </div>
 
             {/* Submit Button */}
@@ -164,6 +171,41 @@ const Login = () => {
           </p>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-sm w-full relative">
+            <button
+              onClick={() => setShowForgotModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              Forgot Password?
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">
+              Please contact our support team via WhatsApp to reset your password. Provide your registered email address.
+            </p>
+            <a
+              href="https://wa.me/6288293673283?text=Hi%20Netpoint%2C%20I%20need%20help%20to%20reset%20my%20password."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-colors"
+            >
+              <MessageCircle className="w-5 h-5" />
+              Chat via WhatsApp
+            </a>
+            <button
+              onClick={() => setShowForgotModal(false)}
+              className="mt-3 w-full text-sm text-gray-500 dark:text-gray-400 hover:underline"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

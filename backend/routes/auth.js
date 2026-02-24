@@ -6,6 +6,7 @@ const { body, validationResult } = require('express-validator');
 const crypto = require('crypto');
 const db = require('../config/database');
 const { recordAudit } = require('../utils/audit');
+const { authMiddleware } = require('../middleware/auth');
 
 const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '7d';
 const REFRESH_TOKEN_DAYS = parseInt(process.env.REFRESH_TOKEN_DAYS || '30', 10);
@@ -205,6 +206,23 @@ router.post('/refresh', [
   } catch (error) {
     console.error('Refresh token error:', error);
     res.status(500).json({ error: 'Server error during token refresh' });
+  }
+});
+
+// Get current authenticated user
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT id, name, email, phone, role, created_at FROM users WHERE id = $1',
+      [req.user.userId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ user: result.rows[0] });
+  } catch (error) {
+    console.error('Get me error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

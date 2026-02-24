@@ -4,7 +4,24 @@ import { MapPin, Wifi, Shield, Clock, AlertCircle, Search, MessageCircle, FileTe
 import { useAuth } from '../contexts/AuthContext';
 import jsPDF from 'jspdf';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
+const SkeletonCard = () => (
+  <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden animate-pulse">
+    <div className="p-8">
+      <div className="h-7 bg-gray-200 dark:bg-gray-700 rounded w-2/3 mb-3" />
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-6" />
+      <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2" />
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-6" />
+      <div className="space-y-3 mb-6">
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+      </div>
+      <div className="h-11 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+    </div>
+  </div>
+);
 
 const SERVICE_LABELS = {
   dia: 'Dedicated Internet Access (DIA)',
@@ -285,16 +302,27 @@ const Results = () => {
           </div>
         </div>
 
-        {(error || info) && (
-            <div className="max-w-4xl mx-auto mb-6 bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg">
-            <AlertCircle className="inline mr-2" size={18} />{error || info}
+        {error && (
+          <div className="max-w-4xl mx-auto mb-6 bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg">
+            <AlertCircle className="inline mr-2" size={18} />{error}
+          </div>
+        )}
+        {info && (
+          <div className="max-w-4xl mx-auto mb-6 bg-green-50 border border-green-200 text-green-700 p-4 rounded-lg">
+            <AlertCircle className="inline mr-2" size={18} />{info}
           </div>
         )}
 
         {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-          {pricingData.map((tier) => {
-            return (
+          {loading ? (
+            [1, 2, 3].map((n) => <SkeletonCard key={n} />)
+          ) : pricingData.length === 0 ? (
+            <div className="col-span-3 text-center py-12 text-gray-500 dark:text-gray-400">
+              No pricing data available for the selected zone and service type.
+            </div>
+          ) : (
+            pricingData.map((tier) => (
               <div
                 key={tier.id}
                 className={`relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden transition-transform hover:scale-105 ${
@@ -372,8 +400,8 @@ const Results = () => {
                   </div>
                 </div>
               </div>
-            );
-          })}
+            ))
+          )}
         </div>
 
         {/* Your Order */}

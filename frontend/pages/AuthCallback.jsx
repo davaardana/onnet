@@ -2,50 +2,42 @@ import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 const AuthCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { login } = useAuth();
 
   useEffect(() => {
     const token = searchParams.get('token');
-    
-    if (token) {
-      // Decode JWT to get user info
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        
-        // Store token and user info
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify({
-          id: payload.userId,
-          email: payload.email,
-          role: payload.role
-        }));
 
-        // Update auth context
-        if (setUser) {
-          setUser({
-            id: payload.userId,
-            email: payload.email,
-            role: payload.role
-          });
-        }
+    if (!token) {
+      navigate('/login?error=no_token');
+      return;
+    }
 
-        // Redirect based on role
-        if (payload.role === 'admin') {
+    // Verify token with backend and get real user data
+    fetch(`${API_BASE}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Token verification failed');
+        return res.json();
+      })
+      .then(({ user }) => {
+        login(user, token);
+        if (user.role === 'admin') {
           navigate('/admin');
         } else {
           navigate('/');
         }
-      } catch (error) {
-        console.error('Token decode error:', error);
+      })
+      .catch((error) => {
+        console.error('AuthCallback error:', error);
         navigate('/login?error=invalid_token');
-      }
-    } else {
-      navigate('/login?error=no_token');
-    }
-  }, [searchParams, navigate, setUser]);
+      });
+  }, [searchParams, navigate, login]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">

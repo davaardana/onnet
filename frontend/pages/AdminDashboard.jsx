@@ -29,6 +29,13 @@ const AdminDashboard = () => {
     fetchStats();
   }, [user, navigate]);
 
+  // Auto-load datasets when switching to 'data' tab
+  useEffect(() => {
+    if (activeTab === 'data') {
+      fetchDatasets();
+    }
+  }, [activeTab]);
+
   const fetchStats = async () => {
     try {
       const apiUrl = import.meta.env.VITE_API_URL || '/api';
@@ -41,9 +48,6 @@ const AdminDashboard = () => {
       if (response.ok) {
         const data = await response.json();
         setStats(data);
-        if (activeTab === 'data') {
-          await fetchDatasets();
-        }
       }
     } catch (error) {
       console.error('Error fetching stats:', error);

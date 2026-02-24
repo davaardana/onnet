@@ -2,6 +2,18 @@ import React, { createContext, useContext, useState } from 'react';
 
 const AuthContext = createContext();
 
+// Storage helper — uses localStorage (persistent) or sessionStorage (tab-only)
+const storage = {
+  set: (key, value, remember = true) => {
+    (remember ? localStorage : sessionStorage).setItem(key, value);
+  },
+  get: (key) => localStorage.getItem(key) ?? sessionStorage.getItem(key),
+  remove: (key) => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  },
+};
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -12,38 +24,39 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    try {
+      const savedUser = storage.get('user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      storage.remove('user');
+      return null;
+    }
   });
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem('token') !== null;
+    return storage.get('token') !== null;
   });
   const [token, setToken] = useState(() => {
-    return localStorage.getItem('token');
+    return storage.get('token');
   });
 
-  const login = (userData, authToken) => {
+  const login = (userData, authToken, remember = true) => {
     setUser(userData);
     setIsAuthenticated(true);
     setToken(authToken);
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('token', authToken);
+    storage.set('user', JSON.stringify(userData), remember);
+    storage.set('token', authToken, remember);
   };
 
   const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
     setToken(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    storage.remove('user');
+    storage.remove('token');
   };
 
   const register = (userData, authToken) => {
-    setUser(userData);
-    setIsAuthenticated(true);
-    setToken(authToken);
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('token', authToken);
+    login(userData, authToken, true);
   };
 
   return (

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Network, Mail, Phone, MapPin } from 'lucide-react';
 
 const Footer = () => {
@@ -26,14 +27,14 @@ const Footer = () => {
             </h3>
             <ul className="space-y-2">
               <li>
-                <a href="/" className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm">
+                <Link to="/" className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm">
                   Home
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/search" className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm">
+                <Link to="/search" className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm">
                   Search Location
-                </a>
+                </Link>
               </li>
               <li>
                 <a href="#" className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 text-sm">
