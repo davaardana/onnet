@@ -209,20 +209,41 @@ router.post('/refresh', [
   }
 });
 
-// Logout - revoke refresh token from DB so it cannot be reused
-router.post('/logout', authMiddleware, async (req, res) => {
+// Logout - revoke refresh token from DB so it cannot be reused.
+// Does NOT require a valid access token so expired-token clients can still
+// properly revoke their refresh token.
+router.post('/logout', async (req, res) => {
   try {
     const { refreshToken } = req.body;
-    if (refreshToken) {
-      const incomingHash = hashToken(refreshToken);
-      await db.query(
-        `UPDATE refresh_tokens
-         SET revoked_at = NOW()
-         WHERE token_hash = $1 AND user_id = $2 AND revoked_at IS NULL`,
-        [incomingHash, req.user.userId]
-      );
+
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'refreshToken is required' });
     }
-    recordAudit(req.user.userId, 'logout', 'auth', {}, req);
+
+    const incomingHash = hashToken(refreshToken);
+
+    // Look up the token to find the owning user (validates it belongs to someone)
+    const tokenResult = await db.query(
+      `SELECT user_id FROM refresh_tokens
+       WHERE token_hash = $1 AND revoked_at IS NULL`,
+      [incomingHash]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      // Token already revoked or never existed — treat as success (idempotent)
+      return res.json({ message: 'Logged out successfully' });
+    }
+
+    const userId = tokenResult.rows[0].user_id;
+
+    await db.query(
+      `UPDATE refresh_tokens
+       SET revoked_at = NOW()
+       WHERE token_hash = $1 AND revoked_at IS NULL`,
+      [incomingHash]
+    );
+
+    recordAudit(userId, 'logout', 'auth', {}, req);
     res.json({ message: 'Logged out successfully' });
   } catch (error) {
     console.error('Logout error:', error);

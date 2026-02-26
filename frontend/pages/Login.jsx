@@ -39,7 +39,7 @@ const Login = () => {
         })
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (response.ok) {
         // Pass remember flag — true = localStorage, false = sessionStorage
@@ -52,7 +52,11 @@ const Login = () => {
           navigate('/');
         }
       } else {
-        setError(data.error || 'Login failed. Please check your username/email and password.');
+        if (response.status === 429) {
+          setError('Too many login attempts. Please wait 15 minutes before trying again.');
+        } else {
+          setError(data.error || data.errors?.[0]?.msg || 'Login failed. Please check your credentials.');
+        }
       }
     } catch (err) {
       console.error('Login error:', err);

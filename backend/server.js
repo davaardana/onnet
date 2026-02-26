@@ -8,6 +8,7 @@ const locationRoutes = require('./routes/locations');
 const orderRoutes = require('./routes/orders');
 const adminRoutes = require('./routes/admin');
 const pricingRoutes = require('./routes/pricing');
+const buildingRoutes = require('./routes/buildings');
 const initDatabase = require('./config/initDb');
 
 dotenv.config();
@@ -35,9 +36,19 @@ const generalLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 login/register attempts per windowMs
-  message: 'Too many authentication attempts, please try again later.',
+  max: 20, // Limit each IP to 20 login/register/refresh attempts per windowMs
+  message: { error: 'Too many authentication attempts. Please try again in 15 minutes.' },
   skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Lighter limiter for logout & /me — no brute-force risk, just prevent abuse
+const lightAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // CORS Configuration
@@ -62,12 +73,16 @@ initDatabase().then(() => {
   console.error('Database initialization failed:', err);
 });
 
-// Routes
-app.use('/api/auth', authLimiter, authRoutes);
+// Routes — apply strict limiter only to credential-based endpoints
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/refresh', authLimiter);
+app.use('/api/auth', lightAuthLimiter, authRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/pricing', pricingRoutes);
+app.use('/api', buildingRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

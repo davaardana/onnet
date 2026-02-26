@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Wifi, Shield, Clock, AlertCircle, Search, MessageCircle, FileText } from 'lucide-react';
+import { MapPin, Wifi, Shield, Clock, AlertCircle, Search, MessageCircle, FileText, ExternalLink } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import jsPDF from 'jspdf';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const PPN_RATE = 0.11;          // PPN 11%
+const USD_RATE = 15500;          // 1 USD = Rp 15.500
+const toUSD = (idr) => idr ? Number(idr) / USD_RATE : null;
+const withPPN = (price) => price ? Number(price) * (1 + PPN_RATE) : null;
+const ppnAmount = (price) => price ? Number(price) * PPN_RATE : null;
 
 const SkeletonCard = () => (
   <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden animate-pulse">
@@ -36,7 +41,7 @@ const P2P_SERVICES = ['metronet', 'dc2dc', 'darkfiber'];
 const Results = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { isAuthenticated, token, user } = useAuth();
+  const { isAuthenticated, user, apiFetch } = useAuth();
   const location = searchParams.get('location');
   const aEnd = searchParams.get('aEnd') || location;
   const bEnd = searchParams.get('bEnd') || '';
@@ -77,21 +82,20 @@ const Results = () => {
     try {
       const payload = {
         locationName: isP2P ? `${aEnd} → ${bEnd}` : (selectedBuilding?.building_name || location),
-        locationId: isP2P ? null : (selectedBuilding?.id || null),
+        // locationId references locations table, not buildings — do not pass buildings.id here
+        locationId: null,
         bandwidth_mbps: tier.bandwidth_mbps,
         service_type: tier.serviceType,
+        service_category: serviceCategory || null,
         zone: tier.zone,
         notes: `[${SERVICE_LABELS[serviceCategory] || serviceCategory}] ${tier.tier} — A: ${aEnd || location}${bEnd ? ` B: ${bEnd}` : ''}`,
         whatsapp_number: user?.phone || null,
         source: 'results_page'
       };
 
-      await fetch(`${API_BASE}/orders`, {
+      await apiFetch(`${API_BASE}/orders`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
     } catch (err) {
@@ -123,12 +127,18 @@ const Results = () => {
     }
 
     const lines = [
-      `Bandwidth: ${tier.bandwidth_mbps || tier.tier}`,
-      `Service Type: ${tier.serviceType}`,
-      `Zone: ${tier.zone}`,
-      `MRC: ${formatRupiah(tier.basePrice)}`,
-      `OTC: ${formatRupiah(tier.otc)}`,
-      'Price excludes tax'
+      `Bandwidth      : ${tier.bandwidth_mbps || tier.tier}`,
+      `Service Type   : ${tier.serviceType}`,
+      `Zone           : ${tier.zone}`,
+      `Exchange Rate  : 1 USD = Rp 15,500 (PPN 11% incl.)`,
+      '',
+      `MRC (excl. PPN): ${formatUSD(tier.basePrice)}`,
+      `VAT 11%        : ${formatUSD(ppnAmount(tier.basePrice))}`,
+      `Total MRC      : ${formatUSD(withPPN(tier.basePrice))}`,
+      '',
+      `OTC (excl. PPN): ${formatUSD(tier.otc)}`,
+      `VAT 11%        : ${formatUSD(ppnAmount(tier.otc))}`,
+      `Total OTC      : ${formatUSD(withPPN(tier.otc))}`,
     ];
 
     doc.setFontSize(12);
@@ -143,9 +153,15 @@ const Results = () => {
     doc.save(`netpoint-quote-${tier.bandwidth_mbps || tier.tier}.pdf`);
   };
 
-  const formatRupiah = (value) => {
-    if (value === null || value === undefined) return 'N/A';
-    return `Rp ${Number(value).toLocaleString('id-ID')}`;
+  const formatUSD = (idrValue) => {
+    if (idrValue === null || idrValue === undefined) return 'N/A';
+    const usd = toUSD(Number(idrValue));
+    return `$${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const getMapsUrl = (address, buildingName = '') => {
+    const query = encodeURIComponent([buildingName, address].filter(Boolean).join(', '));
+    return `https://www.google.com/maps/search/?api=1&query=${query}`;
   };
 
   useEffect(() => {
@@ -346,13 +362,21 @@ const Results = () => {
                   <div className="mb-6">
                     {tier.basePrice ? (
                       <>
-                        <div className="flex items-baseline">
-                          <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
-                            {formatRupiah(tier.basePrice)}
+                        <div className="flex items-baseline mb-1">
+                          <span className="text-3xl font-bold text-primary-600 dark:text-primary-400">
+                            {formatUSD(withPPN(tier.basePrice))}
                           </span>
                           <span className="text-gray-600 dark:text-gray-400 ml-2">/month</span>
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">OTC: {formatRupiah(tier.otc)}</div>
+                        <div className="text-xs text-gray-400 dark:text-gray-500 space-y-0.5">
+                          <div>Base price: {formatUSD(tier.basePrice)}</div>
+                          <div>VAT 11%: {formatUSD(ppnAmount(tier.basePrice))}</div>
+                          <div className="text-gray-300 dark:text-gray-600">Rate: 1 USD = Rp 15,500</div>
+                        </div>
+                        <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                          OTC: <span className="font-medium">{formatUSD(withPPN(tier.otc))}</span>
+                          <span className="text-xs ml-1">(incl. VAT)</span>
+                        </div>
                       </>
                     ) : (
                       <div className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -417,21 +441,88 @@ const Results = () => {
               )}
               {isP2P ? (
                 <>
-                  <div><span className="font-semibold">A-End:</span> {aEnd || '-'}</div>
-                  <div><span className="font-semibold">B-End:</span> {bEnd || '-'}</div>
+                  <div className="flex items-center gap-2">
+                    <span><span className="font-semibold">A-End:</span> {aEnd || '-'}</span>
+                    {aEnd && (
+                      <a
+                        href={getMapsUrl(selectedBEndBuilding?.address || aEnd, aEnd)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExternalLink className="w-3 h-3" /> Maps
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span><span className="font-semibold">B-End:</span> {bEnd || '-'}</span>
+                    {bEnd && (
+                      <a
+                        href={getMapsUrl(selectedBEndBuilding?.address || bEnd, bEnd)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-orange-500 hover:underline flex-shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExternalLink className="w-3 h-3" /> Maps
+                      </a>
+                    )}
+                  </div>
                 </>
               ) : (
                 <>
                   <div><span className="font-semibold">Location:</span> {selectedBuilding?.building_name || location || '-'}</div>
-                  <div><span className="font-semibold">Address:</span> {selectedBuilding?.address || 'N/A'}</div>
+                  <div className="flex items-center gap-2">
+                    <span><span className="font-semibold">Address:</span> {selectedBuilding?.address || 'N/A'}</span>
+                    {selectedBuilding?.address && (
+                      <a
+                        href={getMapsUrl(selectedBuilding.address, selectedBuilding.building_name)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExternalLink className="w-3 h-3" /> Maps
+                      </a>
+                    )}
+                  </div>
                 </>
               )}
               <div><span className="font-semibold">Bandwidth:</span> {selectedTier.tier}</div>
               <div><span className="font-semibold">Service Type:</span> {selectedTier.serviceType}</div>
               <div><span className="font-semibold">Zone:</span> {selectedTier.zone}</div>
-              <div><span className="font-semibold">MRC:</span> {formatRupiah(selectedTier.basePrice)}</div>
-              <div><span className="font-semibold">OTC:</span> {formatRupiah(selectedTier.otc)}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Prices exclude tax</div>
+              <div className="md:col-span-2 border-t border-gray-100 dark:border-gray-700 pt-3 mt-1">
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">Rate: 1 USD = Rp 15,500 &bull; VAT 11% included</p>
+                <table className="w-full text-sm">
+                  <tbody>
+                    <tr>
+                      <td className="text-gray-500 dark:text-gray-400 py-0.5">MRC (excl. VAT)</td>
+                      <td className="text-right font-medium">{formatUSD(selectedTier.basePrice)}</td>
+                    </tr>
+                    <tr>
+                      <td className="text-gray-500 dark:text-gray-400 py-0.5">VAT 11%</td>
+                      <td className="text-right">{formatUSD(ppnAmount(selectedTier.basePrice))}</td>
+                    </tr>
+                    <tr className="font-semibold text-primary-600 dark:text-primary-400">
+                      <td className="py-0.5">Total MRC (incl. VAT)</td>
+                      <td className="text-right">{formatUSD(withPPN(selectedTier.basePrice))}</td>
+                    </tr>
+                    <tr className="border-t border-gray-100 dark:border-gray-700">
+                      <td className="text-gray-500 dark:text-gray-400 pt-2">OTC (excl. VAT)</td>
+                      <td className="text-right pt-2">{formatUSD(selectedTier.otc)}</td>
+                    </tr>
+                    <tr>
+                      <td className="text-gray-500 dark:text-gray-400 py-0.5">VAT 11%</td>
+                      <td className="text-right">{formatUSD(ppnAmount(selectedTier.otc))}</td>
+                    </tr>
+                    <tr className="font-semibold text-primary-600 dark:text-primary-400">
+                      <td className="py-0.5">Total OTC (incl. VAT)</td>
+                      <td className="text-right">{formatUSD(withPPN(selectedTier.otc))}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
               <button
@@ -470,9 +561,22 @@ const Results = () => {
                   onClick={() => setSelectedBuilding(b)}
                   className={`py-3 cursor-pointer ${selectedBuilding?.id === b.id ? 'bg-primary-50 dark:bg-primary-900/30 rounded-lg px-3' : ''}`}
                 >
-                  <div className="font-semibold text-gray-900 dark:text-white">{b.building_name}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{b.address}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-500">{b.city || 'N/A'} • {b.zone || 'Zone ?'}</div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-gray-900 dark:text-white">{b.building_name}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">{b.address}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-500">{b.city || 'N/A'} • {b.zone || 'Zone ?'}</div>
+                    </div>
+                    <a
+                      href={getMapsUrl(b.address, b.building_name)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-200 bg-primary-50 dark:bg-primary-900/40 hover:bg-primary-100 dark:hover:bg-primary-900/70 px-2 py-1 rounded-md transition-colors mt-0.5"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Maps
+                    </a>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -498,9 +602,22 @@ const Results = () => {
                     onClick={() => setSelectedBEndBuilding(b)}
                     className={`py-3 cursor-pointer ${selectedBEndBuilding?.id === b.id ? 'bg-orange-50 dark:bg-orange-900/30 rounded-lg px-3' : ''}`}
                   >
-                    <div className="font-semibold text-gray-900 dark:text-white">{b.building_name}</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">{b.address}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-500">{b.city || 'N/A'} • {b.zone || 'Zone ?'}</div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-gray-900 dark:text-white">{b.building_name}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">{b.address}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-500">{b.city || 'N/A'} • {b.zone || 'Zone ?'}</div>
+                      </div>
+                      <a
+                        href={getMapsUrl(b.address, b.building_name)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-200 bg-orange-50 dark:bg-orange-900/40 hover:bg-orange-100 dark:hover:bg-orange-900/70 px-2 py-1 rounded-md transition-colors mt-0.5"
+                      >
+                        <ExternalLink className="w-3 h-3" /> Maps
+                      </a>
+                    </div>
                   </li>
                 ))}
               </ul>

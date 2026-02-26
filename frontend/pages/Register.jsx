@@ -60,10 +60,14 @@ const Register = () => {
         })
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setError(data.error || 'Registration failed');
+        if (response.status === 429) {
+          setError('Too many attempts. Please wait 15 minutes before trying again.');
+        } else {
+          setError(data.error || data.errors?.[0]?.msg || 'Registration failed. Please try again.');
+        }
         return;
       }
 

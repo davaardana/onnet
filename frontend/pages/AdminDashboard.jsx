@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 const AdminDashboard = () => {
-  const { user, token } = useAuth();
+  const { user, apiFetch } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -39,11 +39,7 @@ const AdminDashboard = () => {
   const fetchStats = async () => {
     try {
       const apiUrl = import.meta.env.VITE_API_URL || '/api';
-      const response = await fetch(`${apiUrl}/admin/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await apiFetch(`${apiUrl}/admin/stats`);
 
       if (response.ok) {
         const data = await response.json();
@@ -66,11 +62,7 @@ const AdminDashboard = () => {
         q: buildingSearch
       });
 
-      const response = await fetch(`${apiUrl}/admin/datasets?${query.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await apiFetch(`${apiUrl}/admin/datasets?${query.toString()}`);
       if (!response.ok) return;
       const data = await response.json();
       setDatasets(data);
@@ -83,12 +75,9 @@ const AdminDashboard = () => {
     try {
       setSavingStatusId(orderId);
       const apiUrl = import.meta.env.VITE_API_URL || '/api';
-      const response = await fetch(`${apiUrl}/admin/orders/${orderId}/status`, {
+      const response = await apiFetch(`${apiUrl}/admin/orders/${orderId}/status`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       });
 
