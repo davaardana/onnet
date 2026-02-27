@@ -6,6 +6,12 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 // Helper: calculate price by service type and zone
 const P2P_SERVICE_TYPES = ['metronet', 'dc2dc', 'darkfiber'];
 
+// Helper: round price to nearest integer
+const roundPrice = (price) => {
+  if (price === null || price === undefined) return null;
+  return Math.round(Number(price));
+};
+
 const calculatePrice = (priceRow, serviceType, zone) => {
   let otc;
   let mrc;
@@ -33,7 +39,7 @@ const calculatePrice = (priceRow, serviceType, zone) => {
         break;
     }
     // null is valid for P2P — means "custom quote"
-    return { otc: otc ?? null, mrc: mrc ?? null };
+    return { otc: roundPrice(otc), mrc: roundPrice(mrc) };
   }
 
   if (!validZones.includes(zone)) {
@@ -73,7 +79,7 @@ const calculatePrice = (priceRow, serviceType, zone) => {
     throw new Error('Pricing not available for given inputs');
   }
 
-  return { otc, mrc };
+  return { otc: roundPrice(otc), mrc: roundPrice(mrc) };
 };
 
 // ============================================

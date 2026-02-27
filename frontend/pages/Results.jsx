@@ -156,7 +156,7 @@ const Results = () => {
   const formatUSD = (idrValue) => {
     if (idrValue === null || idrValue === undefined) return 'N/A';
     const usd = toUSD(Number(idrValue));
-    return `$${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `$${usd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
 
   const getMapsUrl = (address, buildingName = '') => {
