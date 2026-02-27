@@ -106,6 +106,7 @@ router.get('/public/pricing', async (req, res) => {
           zone,
           otc,
           mrc,
+          currency: 'USD',
           is_custom: otc === null || mrc === null,
           year: row.year
         };
@@ -117,13 +118,14 @@ router.get('/public/pricing', async (req, res) => {
           zone,
           otc: null,
           mrc: null,
+          currency: 'USD',
           is_custom: true,
           year: row.year
         };
       }
     });
 
-    res.json({ pricing });
+    res.json({ pricing, currency: 'USD' });
   } catch (error) {
     console.error('Error fetching public pricing:', error.message || error);
     res.status(400).json({ error: error.message || 'Failed to fetch pricing' });
@@ -416,6 +418,7 @@ router.post('/quote', authMiddleware, adminMiddleware, async (req, res) => {
         zone: resolvedZone,
         otc: pricing.otc,
         mrc: pricing.mrc,
+        currency: 'USD',
         price_list_id: price.id
       },
       building,

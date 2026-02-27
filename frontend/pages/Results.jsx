@@ -6,8 +6,6 @@ import jsPDF from 'jspdf';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const PPN_RATE = 0.11;          // PPN 11%
-const USD_RATE = 15500;          // 1 USD = Rp 15.500
-const toUSD = (idr) => idr ? Number(idr) / USD_RATE : null;
 const withPPN = (price) => price ? Number(price) * (1 + PPN_RATE) : null;
 const ppnAmount = (price) => price ? Number(price) * PPN_RATE : null;
 
@@ -130,13 +128,13 @@ const Results = () => {
       `Bandwidth      : ${tier.bandwidth_mbps || tier.tier}`,
       `Service Type   : ${tier.serviceType}`,
       `Zone           : ${tier.zone}`,
-      `Exchange Rate  : 1 USD = Rp 15,500 (PPN 11% incl.)`,
+      `Currency       : USD (VAT 11% incl.)`,
       '',
-      `MRC (excl. PPN): ${formatUSD(tier.basePrice)}`,
+      `MRC (excl. VAT): ${formatUSD(tier.basePrice)}`,
       `VAT 11%        : ${formatUSD(ppnAmount(tier.basePrice))}`,
       `Total MRC      : ${formatUSD(withPPN(tier.basePrice))}`,
       '',
-      `OTC (excl. PPN): ${formatUSD(tier.otc)}`,
+      `OTC (excl. VAT): ${formatUSD(tier.otc)}`,
       `VAT 11%        : ${formatUSD(ppnAmount(tier.otc))}`,
       `Total OTC      : ${formatUSD(withPPN(tier.otc))}`,
     ];
@@ -153,10 +151,9 @@ const Results = () => {
     doc.save(`netpoint-quote-${tier.bandwidth_mbps || tier.tier}.pdf`);
   };
 
-  const formatUSD = (idrValue) => {
-    if (idrValue === null || idrValue === undefined) return 'N/A';
-    const usd = toUSD(Number(idrValue));
-    return `$${usd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const formatUSD = (usdValue) => {
+    if (usdValue === null || usdValue === undefined) return 'N/A';
+    return `$${Number(usdValue).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
 
   const getMapsUrl = (address, buildingName = '') => {
@@ -371,7 +368,7 @@ const Results = () => {
                         <div className="text-xs text-gray-400 dark:text-gray-500 space-y-0.5">
                           <div>Base price: {formatUSD(tier.basePrice)}</div>
                           <div>VAT 11%: {formatUSD(ppnAmount(tier.basePrice))}</div>
-                          <div className="text-gray-300 dark:text-gray-600">Rate: 1 USD = Rp 15,500</div>
+                          <div className="text-gray-300 dark:text-gray-600">Prices in USD</div>
                         </div>
                         <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                           OTC: <span className="font-medium">{formatUSD(withPPN(tier.otc))}</span>
@@ -493,7 +490,7 @@ const Results = () => {
               <div><span className="font-semibold">Service Type:</span> {selectedTier.serviceType}</div>
               <div><span className="font-semibold">Zone:</span> {selectedTier.zone}</div>
               <div className="md:col-span-2 border-t border-gray-100 dark:border-gray-700 pt-3 mt-1">
-                <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">Rate: 1 USD = Rp 15,500 &bull; VAT 11% included</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">Prices in USD &bull; VAT 11% included</p>
                 <table className="w-full text-sm">
                   <tbody>
                     <tr>
