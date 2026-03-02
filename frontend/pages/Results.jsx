@@ -45,6 +45,8 @@ const Results = () => {
   const bEnd = searchParams.get('bEnd') || '';
   const serviceCategory = searchParams.get('serviceCategory') || '';
   const reqBandwidth = searchParams.get('bandwidth') || '';
+  const requestedBandwidth = Number.parseInt(reqBandwidth, 10);
+  const hasRequestedBandwidth = Number.isInteger(requestedBandwidth) && requestedBandwidth > 0;
   const isP2P = P2P_SERVICES.includes(serviceCategory);
 
   const [selectedTier, setSelectedTier] = useState(null);
@@ -169,7 +171,11 @@ const Results = () => {
       try {
         const requests = [
           fetch(`${API_BASE}/pricing/public/buildings?q=${encodeURIComponent(location)}&limit=5`),
-          fetch(`${API_BASE}/pricing/public/pricing?service_type=${serviceType}&zone=${encodeURIComponent(zone)}`),
+          fetch(
+            `${API_BASE}/pricing/public/pricing?service_type=${serviceType}&zone=${encodeURIComponent(zone)}${
+              hasRequestedBandwidth ? `&bandwidth_mbps=${requestedBandwidth}` : ''
+            }`
+          ),
         ];
         if (isP2P && bEnd) {
           requests.push(fetch(`${API_BASE}/pricing/public/buildings?q=${encodeURIComponent(bEnd)}&limit=5`));

@@ -89,12 +89,23 @@ const calculatePrice = (priceRow, serviceType, zone) => {
 // Public price list with computed OTC/MRC per service/zone
 router.get('/public/pricing', async (req, res) => {
   try {
-    const { service_type = 'domestic', zone = 'Zone 1', year = 2026 } = req.query;
+    const { service_type = 'domestic', zone = 'Zone 1', year = 2026, bandwidth_mbps } = req.query;
 
-    const { rows } = await db.query(
-      'SELECT * FROM price_list WHERE year = $1 AND status = $2 ORDER BY bandwidth_mbps',
-      [year, 'active']
-    );
+    let query = 'SELECT * FROM price_list WHERE year = $1 AND status = $2';
+    const params = [year, 'active'];
+
+    if (bandwidth_mbps !== undefined && bandwidth_mbps !== null && bandwidth_mbps !== '') {
+      const parsedBandwidth = Number.parseInt(bandwidth_mbps, 10);
+      if (Number.isNaN(parsedBandwidth) || parsedBandwidth <= 0) {
+        return res.status(400).json({ error: 'Invalid bandwidth_mbps parameter' });
+      }
+      query += ' AND bandwidth_mbps = $3';
+      params.push(parsedBandwidth);
+    }
+
+    query += ' ORDER BY bandwidth_mbps';
+
+    const { rows } = await db.query(query, params);
 
     const pricing = rows.map((row) => {
       try {
