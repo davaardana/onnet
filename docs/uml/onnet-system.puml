@@ -1,0 +1,79 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+
+left to right direction
+
+actor User as user
+
+rectangle "Frontend (Vite + React)" as FE {
+  [Home Page]
+  [Results Page]
+  [Auth Context]
+}
+
+rectangle "Backend (Node.js + Express)" as BE {
+  [Auth Routes]
+  [Pricing Routes]
+  [Orders Routes]
+  [Admin Routes]
+}
+
+database "PostgreSQL" as DB {
+  [users]
+  [price_list]
+  [quote_logs]
+  [orders]
+  [buildings]
+}
+
+cloud "Nginx" as NGINX
+
+user --> FE : Search location + input bandwidth
+FE --> NGINX : HTTPS request
+NGINX --> BE : /api/*
+
+FE --> BE : GET /api/pricing/public/pricing\n?service_type&zone&bandwidth_mbps
+BE --> DB : SELECT from price_list\n(filter bandwidth_mbps)
+DB --> BE : Pricing rows (USD)
+BE --> FE : JSON pricing
+
+FE --> BE : POST /api/auth/login
+BE --> DB : Validate user
+DB --> BE : user + token data
+BE --> FE : token + refreshToken
+
+FE --> BE : POST /api/orders
+BE --> DB : INSERT orders
+DB --> BE : order saved
+BE --> FE : order created
+
+@enduml
+
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+
+title Sequence - Public Pricelist by Requested Bandwidth
+
+actor User
+participant "Results Page" as FE
+participant "Pricing API\n/backend/routes/pricing.js" as API
+database "PostgreSQL\nprice_list" as DB
+
+User -> FE : Open results with bandwidth=100
+FE -> API : GET /api/pricing/public/pricing\n?service_type=domestic\n&zone=Zone 1\n&bandwidth_mbps=100
+
+API -> API : Validate bandwidth_mbps
+alt invalid bandwidth_mbps
+  API --> FE : 400 {"error":"Invalid bandwidth_mbps parameter"}
+else valid bandwidth_mbps
+  API -> DB : SELECT * FROM price_list\nWHERE year=? AND status='active'\nAND bandwidth_mbps=100
+  DB --> API : matching rows
+  API --> FE : 200 { pricing:[...], currency:"USD" }
+end
+
+FE --> User : Render only matched tier(s)
+
+@enduml
