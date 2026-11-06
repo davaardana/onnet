@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff, X, MessageCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 
 const Login = () => {
   const [identifier, setIdentifier] = useState('');
@@ -12,6 +13,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -43,6 +45,7 @@ const Login = () => {
 
       if (response.ok) {
         // Pass remember flag — true = localStorage, false = sessionStorage
+        toast.success(`Welcome back, ${data.user.name || 'User'}!`);
         login(data.user, data.token, data.refreshToken, remember);
 
         // Redirect based on role
@@ -55,7 +58,9 @@ const Login = () => {
         if (response.status === 429) {
           setError('Too many login attempts. Please wait 15 minutes before trying again.');
         } else {
-          setError(data.error || data.errors?.[0]?.msg || 'Login failed. Please check your credentials.');
+          const msg = data.error || data.errors?.[0]?.msg || 'Login failed. Please check your credentials.';
+          setError(msg);
+          toast.error(msg);
         }
       }
     } catch (err) {

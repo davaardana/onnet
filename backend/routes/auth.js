@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const db = require('../config/database');
 const { recordAudit } = require('../utils/audit');
 const { authMiddleware } = require('../middleware/auth');
+const { passport, isGoogleConfigured } = require('../config/passport');
 
 const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '2h';
 const REFRESH_TOKEN_DAYS = parseInt(process.env.REFRESH_TOKEN_DAYS || '30', 10);
@@ -155,6 +156,40 @@ router.post('/login', [
     console.error('Login error:', error);
     res.status(500).json({ error: 'Server error during login' });
   }
+});
+
+// Google OAuth initiation (graceful handling if unconfigured)
+router.get('/google', (req, res, next) => {
+  if (!isGoogleConfigured()) {
+    return res.status(503).json({
+      error: 'Google OAuth is not configured on this server. Please sign in using your username/email and password.'
+    });
+  }
+  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+});
+
+// Google OAuth callback
+router.get('/google/callback', (req, res, next) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'https://netpoint.id';
+  if (!isGoogleConfigured()) {
+    return res.redirect(`${frontendUrl}/login?error=google_not_configured`);
+  }
+  passport.authenticate('google', { session: false }, async (err, user) => {
+    if (err || !user) {
+      console.error('Google callback error:', err);
+      return res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
+    }
+    try {
+      const accessToken = signAccessToken(user);
+      const { token: refreshToken, tokenHash, expiresAt } = createRefreshToken();
+      await persistRefreshToken(user.id, tokenHash, expiresAt, req);
+      recordAudit(user.id, 'login', 'auth', { method: 'google' }, req);
+      return res.redirect(`${frontendUrl}/auth/callback?token=${accessToken}&refreshToken=${refreshToken}`);
+    } catch (error) {
+      console.error('Token creation error after Google auth:', error);
+      return res.redirect(`${frontendUrl}/login?error=token_error`);
+    }
+  })(req, res, next);
 });
 
 // Refresh access token

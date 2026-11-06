@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Eye, EyeOff, Phone } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -15,6 +16,7 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const { register } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -66,12 +68,15 @@ const Register = () => {
         if (response.status === 429) {
           setError('Too many attempts. Please wait 15 minutes before trying again.');
         } else {
-          setError(data.error || data.errors?.[0]?.msg || 'Registration failed. Please try again.');
+          const regErr = data.error || data.errors?.[0]?.msg || 'Registration failed. Please try again.';
+          setError(regErr);
+          toast.error(regErr);
         }
         return;
       }
 
       // Save user and token
+      toast.success('Registration successful! Welcome to Netpoint.');
       register(data.user, data.token, data.refreshToken);
 
       // Navigate to home

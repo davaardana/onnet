@@ -3,6 +3,8 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const rateLimit = require('express-rate-limit');
 const compression = require('compression');
+const helmet = require('helmet');
+const logger = require('./utils/logger');
 const authRoutes = require('./routes/auth');
 const locationRoutes = require('./routes/locations');
 const orderRoutes = require('./routes/orders');
@@ -18,6 +20,17 @@ const PORT = process.env.PORT || 5000;
 
 // Trust proxy - required for rate limiting behind Nginx
 app.set('trust proxy', 1);
+
+// HTTP Security Headers via Helmet
+app.use(
+  helmet({
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
+
+// Structured HTTP Request Logger
+app.use(logger.httpLogger);
 
 // Enable compression for all responses
 app.use(compression());
@@ -57,7 +70,7 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
 };
 
 // Middleware
@@ -67,11 +80,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/', generalLimiter);
 
 // Initialize database on startup
-initDatabase().then(() => {
-  console.log('Database initialized');
-}).catch(err => {
-  console.error('Database initialization failed:', err);
-});
+initDatabase()
+  .then(() => {
+    logger.info('Database initialized successfully');
+  })
+  .catch((err) => {
+    logger.error('Database initialization failed', { error: err.message, stack: err.stack });
+  });
 
 // Routes — apply strict limiter only to credential-based endpoints
 app.use('/api/auth/login', authLimiter);
@@ -96,13 +111,16 @@ app.use((req, res) => {
 
 // Error handling middleware — never expose internal errors in production
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  logger.error(`Unhandled error on ${req.method} ${req.path}`, {
+    error: err.message,
+    stack: err.stack,
+  });
   const isProd = process.env.NODE_ENV === 'production';
   res.status(err.status || 500).json({
-    error: isProd ? 'Something went wrong!' : (err.message || 'Internal Server Error')
+    error: isProd ? 'Something went wrong!' : err.message || 'Internal Server Error',
   });
 });
 
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  logger.info(`Server is running on port ${PORT}`, { port: PORT, env: process.env.NODE_ENV });
 });
